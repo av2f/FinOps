@@ -1,0 +1,19 @@
+{
+  "pathResult": "C:/Users/fparment/Documents/AzFinOps/Data/GetAzAhb/",
+  "fileResult": "GetAzAhb",
+  "chronoFile": "Y",
+  "osTypeFilter": "Windows",
+  "hybridBenefit": {
+    "licenseType": "Windows_Server",
+    "name": "Hybrid Benefit"
+  },
+  "virtualDesktop": {
+    "licenseType": "Windows_Client",
+    "name": "Azure Virtual Desktop"
+  },
+  "weightLicenseInCores": 8,
+  "tags": {
+    "environment": "environment",
+    "availability": "ServiceWindows"
+  }
+}

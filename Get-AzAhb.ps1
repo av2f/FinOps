@@ -11,6 +11,8 @@
   Optimize OS Azure Hybrid Management
   ..\Data\GetAzAhb\GetAzAhbmmddyyyyhhmmss.csv
   For more information, type Get-Help .\Get-AzAhb.ps1 [-detailed | -full]
+
+  Global variables are stored in .\GetAzAhb.json and must be adapted accordingly
 #>
 
 <# -----------
@@ -26,15 +28,8 @@ Set-Item -Path Env:\SuppressAzurePowerShellBreakingChangeWarnings -Value $true
 <# -----------
   Declare global variables, arrays and objects
 ----------- #>
-# Directory where is stored results. Change if needed
-$directoryAndFileResult = "GetAzAhb"
-$dataDirectoryResult = "D:\azFinOps\Data\" + $directoryAndFileResult
-# Map tags for environment and availability. Change if needed
-$tags=@{}
-$tags.Add('environment', 'Environment')
-$tags.Add('availability', 'ServiceWindows')
-# Filter on OSType = 'Windows'
-$osTypeFilter = 'Windows'
+# Retrieve global variables from json file
+$globalVar = Get-Content -Raw -Path ".\GetAzAhb.json" | ConvertFrom-Json
 
 <# -----------
   Declare Functions
@@ -50,7 +45,6 @@ function CreateDirectoryResult{
   param(
     [String] $directory
   )
-  Write-Verbose "la directory est $directory"
   if((Test-Path -Path $directory) -eq $False){
     New-Item -Path $directory -ItemType "directory"
   }
@@ -73,6 +67,97 @@ function CreateChronoFile
   return $fileName
 }
 
+function ReplaceEmpty
+{
+  <#
+    Replace an empty string by string given in parameter
+    Input :
+      - $checkStr : String to check
+      - $replacedBy: String to set up if $checkStr is empty
+    Output : 
+      - $checkStr
+  #>
+  param(
+    [String] $checkStr,
+    [String] $replacedBy
+  )
+  if($checkStr -match "^\s*$") { $checkStr = $replacedBy }
+  return $checkStr
+}
+
+function GetVmInfo
+{
+  <#
+    Retrieve for VM:
+    OsType, LicenseType, SKU, Environment and Availibity,
+    filter by OsType = Windows
+    Input:
+      - $rgName: Resource Group Name
+      - $vmName: Virtual Machine Name
+    Output:
+      - $resInfos: array of results
+  #>
+  param(
+    [String] $rgName,
+    [String] $vmName
+  )
+  $resInfos = @()
+  try {
+    $resInfos = (Get-AzVM -ResourceGroupName $rgName -Name $vmName |
+      Where-Object { $_.StorageProfile.OSDisk.OsType -eq $($globalVar.osTypeFilter) } |
+      ForEach-Object {
+        $_.StorageProfile.OSDisk.OsType, $_.LicenseType, $_.HardwareProfile.VmSize,
+        $_.tags.$($globalVar.tags.environment), $_.tags.$($globalVar.tags.availability)
+      }
+    )
+    if ($resInfos.count -gt 0) {
+      # If Tags are empty, replaced by "-"
+      $resInfos[3] = (ReplaceEmpty -checkStr $resInfos[3] -replacedBy "-")
+      $resInfos[4] = (ReplaceEmpty -checkStr $resInfos[4] -replacedBy "-")
+      # search if Hybrid benefit or Virtual desktop license and replace name in $resInfos
+      switch ($resInfos[1].ToUpper()) {
+        $globalVar.hybridBenefit.licenseType.ToUpper() {$resInfos[1] = $globalVar.hybridBenefit.name }
+        $globalVar.virtualDesktop.licenseType.ToUpper() {$resInfos[1] = $globalVar.virtualDesktop.name}
+      }
+    }
+  }
+  catch {
+    Write-Host "An error occured retrieving VM informations for $vmName"
+    $resInfos = @("Error", "Error", "Error", "Error", "Error")
+  }
+  return $resInfos
+}
+
+function GetVmSizing
+{
+  <#
+    Retrieve for VM: Number of Cores and RAM in MB
+    Input:
+      - $rgName: Resource Group Name
+      - $vmName: Virtual Machine Name
+      - $sku: SKU of Virtual Machine
+    Output:
+      - $resSizing: array of results
+  #>
+  param(
+    [String] $rgName,
+    [String] $vmName,
+    [String] $sku
+  )
+  $resSizing = @()
+  try {
+    $resSizing = (Get-AzVMSize -ResourceGroupName $rgName -VMName $vmName |
+      Where-Object { $_.Name -eq $($sku)} |
+      Select-Object -Property NumberOfCores, MemoryInMB
+    )
+  }
+  catch {
+    Write-Host "An error occured retrieving VM informations for $vmName"
+    $resSizing = @("Error", "Error")
+  }
+  return $resSizing
+}
+
 function SetObjResult {
   <#
     $listResult must contains 9 elements
@@ -80,37 +165,46 @@ function SetObjResult {
   param(
     [array] $listResult
   )
-  if($listResult.Count -ne 14){
-    $listResult=@('-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-')
+  if($listResult.Count -ne 16){
+    $listResult=@('-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-',"-","-")
   }
   $objTagResult = @(
     [PSCustomObject]@{
       Subscription = $listResult[0]
       SubscriptionId = $listResult[1]
       ResourceGroup = $listResult[2]
-      VmName = $listResult[3]
+      Vm_Name = $listResult[3]
       Location = $listResult[4]
       PowerState = $listResult[5]
-      OsType = $listResult[6]
-      OsName = $listResult[7]
-      LicenseType = $listResult[8]
+      Os_Type = $listResult[6]
+      Os_Name = $listResult[7]
+      License_Type = $listResult[8]
       Size = $listResult[9]
-      NbCores = $listResult[10]
+      Nb_Cores = $listResult[10]
       Ram = $listResult[11]
-      tagEnvironment = $listResult[12]
-      tagAvailability = $listResult[13]
+      tag_Environment = $listResult[12]
+      tag_Availability = $listResult[13]
+      Cores_Consumed = $listResult[14]
+      Cores_Wasted = $listResult[15]
     }
   )
   return $objTagResult
 }
-
+#
 <# -----------
   Main Program
 ----------- #>
-# Create file name
-if((CreateDirectoryResult $dataDirectoryResult)){
-  $csvFile = $dataDirectoryResult + '\' + (CreateChronoFile $directoryAndFileResult) + '.csv'
+# Create directory results if not exists and filename for results
+# if chronoFile is set to "Y", Create a chrono to the file with format MMddyyyyHHmmss
+if((CreateDirectoryResult $globalVar.pathResult)){
+  if($globalVar.chronoFile.ToUpper() -eq "Y") {
+    $csvFile = $globalVar.pathResult + (CreateChronoFile $globalVar.fileResult) + '.csv'
+  }
+  else {
+    $csvFile = $globalVar.pathResult + $globalVar.fileResult + '.csv'
+  }
 }
+
 Write-Verbose "Starting processing..."
 # ---- For Tests, use 1 subscription ----
 # retrieve Subscriptions enabled
@@ -175,7 +269,7 @@ if($subscriptions.Count -gt 0){
       foreach($resourceGroupName in $resourceGroupNames){
         $objVmResult = @()
         $arrayVm = @()
-        
+        #
         <# ------------
           VM processing
         ------------ #>
@@ -185,39 +279,28 @@ if($subscriptions.Count -gt 0){
           Select-Object -Property Name, Location, OsName, PowerState
         )
         Write-Verbose "--- $($vms.Count) VMs found"
+        #
+        # if there are Virtual Machines
         if($vms.Count -gt 0){
           foreach($vm in $vms){
             # -- Retrieve VM informations
-            $vmInfo = (
-              Get-AzVM -ResourceGroupName $resourceGroupName.ResourceGroupName -Name $vm.Name |
-              Where-Object { $_.StorageProfile.OSDisk.OsType -eq $($osTypeFilter) } |
-              ForEach-Object {
-                $_.StorageProfile.OSDisk.OsType, $_.LicenseType, $_.HardwareProfile.VmSize,
-                $_.tags.$($tags['environment']), $_.tags.$($tags['availability'])
-              }
-            )
-            # if the VM is matching with $osTypeFilter
-            if($vmInfo.Count -gt 0) {
-              # Check if Tags are empty, replaced by "-"
-              if($vmInfo[3] -match "^\s*$") { $vmInfo[3] = "-"}
-              if($vmInfo[4] -match "^\s*$") { $vmInfo[4] = "-"}
-              #
+            $vmInfos = GetVmInfo -rgName $resourceGroupName.ResourceGroupName -vmName $vm.Name
+            # if there VM matching with $osTypeFilter
+            if($vmInfos.Count -gt 0) {
               # -- Retrieve VM sizing
-              $vmSizing = (
-                Get-AzVMSize -ResourceGroupName $resourceGroupName.ResourceGroupName -VMName $vm.Name |
-                Where-Object { $_.Name -eq $($vmInfo[2]) } |
-                Select-Object -Property NumberOfCores, MemoryInMB
-              )
+              $vmSizing = GetVmSizing -rgName $resourceGroupName.ResourceGroupName -vmName $vm.Name -sku $vmInfos[2] 
+              # Aggregate informations
               $objVmResult += SetObjResult @(
                 $subscription.Name, $subscription.Id, $resourceGroupName.ResourceGroupName,
                 $vm.Name, $vm.Location, $vm.PowerState,
-                $vmInfo[0], $vm.OsName, $vmInfo[1],
-                $vmInfo[2], $vmSizing.NumberOfCores, $vmSizing.MemoryInMB,
-                $vmInfo[3],$vmInfo[4]
+                $vmInfos[0], $vm.OsName, $vmInfos[1],
+                $vmInfos[2], $vmSizing.NumberOfCores, $vmSizing.MemoryInMB,
+                $vmInfos[3],$vmInfos[4],0,0
               )
             }
           }
         }
+        # Write in results in result file
         $arrayVm += $objVmResult
         $arrayVm | Export-Csv -Path $csvFile -Delimiter ";" -NoTypeInformation -Append
       }
@@ -227,6 +310,10 @@ if($subscriptions.Count -gt 0){
 }
 
 Write-Verbose "File $csvFile is available."
+
+# --------------- POUR TEST ------
+Get-Date
+# --------------- POUR TEST ------
 
 <# -----------
   Get-Help Informations
