@@ -1,8 +1,8 @@
 <#
   Name    : Get-AzAhb.ps1
   Author  : Frederic Parmentier
-  Version : 0.1
-  Creation Date : 04/01/2024
+  Version : 0.5
+  Creation Date : 04/02/      2024
   
   Updated date  :
   Updated by    :
@@ -45,7 +45,7 @@ function CreateDirectoryResult{
   param(
     [String] $directory
   )
-  if((Test-Path -Path $directory) -eq $False){
+  if ((Test-Path -Path $directory) -eq $False) {
     New-Item -Path $directory -ItemType "directory"
   }
   return $True
@@ -81,7 +81,7 @@ function ReplaceEmpty
     [String] $checkStr,
     [String] $replacedBy
   )
-  if($checkStr -match "^\s*$") { $checkStr = $replacedBy }
+  if ($checkStr -match "^\s*$") { $checkStr = $replacedBy }
   return $checkStr
 }
 
@@ -116,8 +116,8 @@ function GetVmInfo
       $resInfos[4] = (ReplaceEmpty -checkStr $resInfos[4] -replacedBy "-")
       # search if Hybrid benefit or Virtual desktop license and replace name in $resInfos
       switch ($resInfos[1].ToUpper()) {
-        $globalVar.hybridBenefit.licenseType.ToUpper() {$resInfos[1] = $globalVar.hybridBenefit.name }
-        $globalVar.virtualDesktop.licenseType.ToUpper() {$resInfos[1] = $globalVar.virtualDesktop.name}
+        $globalVar.hybridBenefit.licenseType.ToUpper() { $resInfos[1] = $globalVar.hybridBenefit.name }
+        $globalVar.virtualDesktop.licenseType.ToUpper() { $resInfos[1] = $globalVar.virtualDesktop.name}
       }
     }
   }
@@ -147,7 +147,7 @@ function GetVmSizing
   $resSizing = @()
   try {
     $resSizing = (Get-AzVMSize -ResourceGroupName $rgName -VMName $vmName |
-      Where-Object { $_.Name -eq $($sku)} |
+      Where-Object { $_.Name -eq $($sku) } |
       Select-Object -Property NumberOfCores, MemoryInMB
     )
   }
@@ -165,8 +165,8 @@ function SetObjResult {
   param(
     [array] $listResult
   )
-  if($listResult.Count -ne 16){
-    $listResult=@('-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-',"-","-")
+  if ($listResult.Count -ne 16) {
+    $listResult = @('-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-',"-","-")
   }
   $objTagResult = @(
     [PSCustomObject]@{
@@ -196,8 +196,8 @@ function SetObjResult {
 ----------- #>
 # Create directory results if not exists and filename for results
 # if chronoFile is set to "Y", Create a chrono to the file with format MMddyyyyHHmmss
-if((CreateDirectoryResult $globalVar.pathResult)){
-  if($globalVar.chronoFile.ToUpper() -eq "Y") {
+if ((CreateDirectoryResult $globalVar.pathResult)) {
+  if ($globalVar.chronoFile.ToUpper() -eq "Y") {
     $csvFile = $globalVar.pathResult + (CreateChronoFile $globalVar.fileResult) + '.csv'
   }
   else {
@@ -245,8 +245,8 @@ $resourceGroupNames = @(
 ) #>
 
 Write-Verbose "$($subscriptions.Count) subscriptions found."
-if($subscriptions.Count -gt 0){
-  foreach($subscription in $subscriptions){
+if ($subscriptions.Count -gt 0) {
+  foreach ($subscription in $subscriptions) {
     <# ------------
       Subscription processing
     ------------ #>
@@ -265,8 +265,8 @@ if($subscriptions.Count -gt 0){
     Write-Verbose "-- Processing of Resource Groups from $($subscription.Name)"
     $resourceGroupNames = (Get-AzResourceGroup | Select-Object -Property ResourceGroupName | Sort-Object ResouceGroupName)
     Write-Verbose "-- $($resourceGroupNames.Count) Resource Groups found"
-    if($resourceGroupNames.Count -gt 0){
-      foreach($resourceGroupName in $resourceGroupNames){
+    if ($resourceGroupNames.Count -gt 0) {
+      foreach ($resourceGroupName in $resourceGroupNames) {
         $objVmResult = @()
         $arrayVm = @()
         #
@@ -281,16 +281,16 @@ if($subscriptions.Count -gt 0){
         Write-Verbose "--- $($vms.Count) VMs found"
         #
         # if there are Virtual Machines
-        if($vms.Count -gt 0){
-          foreach($vm in $vms){
+        if ($vms.Count -gt 0) {
+          foreach ($vm in $vms) {
             # -- Retrieve VM informations
             $vmInfos = GetVmInfo -rgName $resourceGroupName.ResourceGroupName -vmName $vm.Name
             # if there VM matching with $osTypeFilter
-            if($vmInfos.Count -gt 0) {
+            if ($vmInfos.Count -gt 0) {
               # -- Retrieve VM sizing
               $vmSizing = GetVmSizing -rgName $resourceGroupName.ResourceGroupName -vmName $vm.Name -sku $vmInfos[2] 
               # Aggregate informations
-              $objVmResult += SetObjResult @(
+              $objVmResult += SetObjResult@(
                 $subscription.Name, $subscription.Id, $resourceGroupName.ResourceGroupName,
                 $vm.Name, $vm.Location, $vm.PowerState,
                 $vmInfos[0], $vm.OsName, $vmInfos[1],
