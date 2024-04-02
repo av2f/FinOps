@@ -2,7 +2,7 @@
   Name    : Get-AzAhb.ps1
   Author  : Frederic Parmentier
   Version : 0.5
-  Creation Date : 04/02/      2024
+  Creation Date : 04/02/2024
   
   Updated date  :
   Updated by    :
@@ -110,7 +110,7 @@ function GetVmInfo
         $_.tags.$($globalVar.tags.environment), $_.tags.$($globalVar.tags.availability)
       }
     )
-    if ($resInfos.count -gt 0) {
+    if ($resInfos.count -ne 0) {
       # If Tags are empty, replaced by "-"
       $resInfos[3] = (ReplaceEmpty -checkStr $resInfos[3] -replacedBy "-")
       $resInfos[4] = (ReplaceEmpty -checkStr $resInfos[4] -replacedBy "-")
@@ -245,7 +245,7 @@ $resourceGroupNames = @(
 ) #>
 
 Write-Verbose "$($subscriptions.Count) subscriptions found."
-if ($subscriptions.Count -gt 0) {
+if ($subscriptions.Count -ne 0) {
   foreach ($subscription in $subscriptions) {
     <# ------------
       Subscription processing
@@ -265,7 +265,7 @@ if ($subscriptions.Count -gt 0) {
     Write-Verbose "-- Processing of Resource Groups from $($subscription.Name)"
     $resourceGroupNames = (Get-AzResourceGroup | Select-Object -Property ResourceGroupName | Sort-Object ResouceGroupName)
     Write-Verbose "-- $($resourceGroupNames.Count) Resource Groups found"
-    if ($resourceGroupNames.Count -gt 0) {
+    if ($resourceGroupNames.Count -ne 0) {
       foreach ($resourceGroupName in $resourceGroupNames) {
         $objVmResult = @()
         $arrayVm = @()
@@ -281,16 +281,16 @@ if ($subscriptions.Count -gt 0) {
         Write-Verbose "--- $($vms.Count) VMs found"
         #
         # if there are Virtual Machines
-        if ($vms.Count -gt 0) {
+        if ($vms.Count -ne 0) {
           foreach ($vm in $vms) {
             # -- Retrieve VM informations
             $vmInfos = GetVmInfo -rgName $resourceGroupName.ResourceGroupName -vmName $vm.Name
             # if there VM matching with $osTypeFilter
-            if ($vmInfos.Count -gt 0) {
+            if ($vmInfos.Count -ne 0) {
               # -- Retrieve VM sizing
               $vmSizing = GetVmSizing -rgName $resourceGroupName.ResourceGroupName -vmName $vm.Name -sku $vmInfos[2] 
               # Aggregate informations
-              $objVmResult += SetObjResult@(
+              $objVmResult += SetObjResult @(
                 $subscription.Name, $subscription.Id, $resourceGroupName.ResourceGroupName,
                 $vm.Name, $vm.Location, $vm.PowerState,
                 $vmInfos[0], $vm.OsName, $vmInfos[1],

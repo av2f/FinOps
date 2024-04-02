@@ -1,5 +1,5 @@
 {
-  "pathResult": "C:/Users/fparment/Documents/AzFinOps/Data/GetAzAhb/",
+  "pathResult": "D:/AzFinOps/Data/GetAzAhb/",
   "fileResult": "GetAzAhb",
   "chronoFile": "Y",
   "osTypeFilter": "Windows",
@@ -13,7 +13,7 @@
   },
   "weightLicenseInCores": 8,
   "tags": {
-    "environment": "environment",
+    "environment": "Environment",
     "availability": "ServiceWindows"
   }
 }

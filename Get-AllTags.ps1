@@ -43,7 +43,7 @@ function CreateDirectoryResult{
   param(
     [String] $directory
   )
-  if((Test-Path -Path $directory) -eq $False){
+  if ((Test-Path -Path $directory) -eq $False) {
     New-Item -Path . -Name $directory -ItemType "Directory"
   }
   return $True
@@ -79,7 +79,7 @@ function GetTags
   $tblTags = @{}
   # Retrieve Tags for the subsciption
   $tags = Get-AzTag -ResourceID /subscriptions/$subscription
-  if ($tags.Count -gt 0) {
+  if ($tags.Count -ne 0) {
     foreach($tagKey in $tags.properties.TagsProperty.keys){
       # $tagKey contains the tag Name  
       $tblTags.Add($tagKey, $tags.Properties.TagsProperty[$tagKey])
@@ -94,7 +94,7 @@ function SetObjResult {
   param(
     [array] $listResult
   )
-  if($listResult.Count -ne 9){
+  if ($listResult.Count -ne 9) {
     $listResult=@('-', '-', '-', '-', '-', '-', '-', '-', '-')
   }
   $objTagResult = @(
@@ -117,7 +117,7 @@ function SetObjResult {
   Main Program
 ----------- #>
 # Create file name
-if((CreateDirectoryResult 'GetAllTags')){
+if ((CreateDirectoryResult 'GetAllTags')) {
   $csvFile = '.\GetAllTags\' + (CreateChronoFile 'GetAllTags') + '.csv'
 }
 Write-Verbose "Starting processing..."
@@ -125,8 +125,8 @@ Write-Verbose "Starting processing..."
 # $subscriptions = Get-AzSubscription | Where-Object -Property State -eq "Enabled"
 $subscriptions = Get-AzSubscription | Where-Object {($_.Name -clike "*DXC*") -and ($_.State -eq "Enabled")}
 Write-Verbose "$($subscriptions.Count) subscriptions found."
-if($subscriptions.Count -gt 0){
-  foreach($subscription in $subscriptions){
+if ($subscriptions.Count -ne 0) {
+  foreach ($subscription in $subscriptions) {
     <# ------------
       Subscription processing
     ------------ #>
@@ -137,8 +137,8 @@ if($subscriptions.Count -gt 0){
     Set-AzContext -Subscription $subscription
     # Retrieve subscription tags
     $listTags = (GetTags $subscription)
-    if($listTags.Count -gt 0){
-      foreach($key in $listTags.keys){
+    if ($listTags.Count -ne 0) {
+      foreach ($key in $listTags.keys) {
         $objSubResult += SetObjResult @($subscription.Name, $subscription.Id, '', '', 'Subscription', '', '', $key, $listTags[$key])
       }
     }
@@ -151,17 +151,17 @@ if($subscriptions.Count -gt 0){
     Write-Verbose "-- Processing of Resource Groups from $($subscription.Name)"
     $resourceGroupNames = (Get-AzResourceGroup | Select-Object -Property ResourceGroupName, Location, Tags, ResourceId | Sort-Object Location, ResouceGroupName)
     Write-Verbose "-- $($resourceGroupNames.Count) Resource Groups found"
-    if($resourceGroupNames.Count -gt 0){
-      foreach($resourceGroupName in $resourceGroupNames){
+    if ($resourceGroupNames.Count -ne 0) {
+      foreach ($resourceGroupName in $resourceGroupNames) {
         $objRgResult = @()
         $arrayRgTags = @()
         # Retrives Tags
-        if($resourceGroupName.Tags.Count -gt 0){
-          foreach($key in $resourceGroupName.Tags.keys){
+        if ($resourceGroupName.Tags.Count -ne 0) {
+          foreach ($key in $resourceGroupName.Tags.keys) {
             $objRgResult += SetObjResult @($subscription.Name, $subscription.Id, $resourceGroupName.ResourceGroupName, '', 'Resource Group', $resourceGroupName.ResourceId, $resourceGroupName.Location, $key, $resourceGroupName.Tags[$key])
           }
         }
-        else{
+        else {
           $objRgResult += SetObjResult @($subscription.Name, $subscription.Id, $resourceGroupName.ResourceGroupName, '', 'Resource Group', $resourceGroupName.ResourceId, $resourceGroupName.Location, '-', '-')
         }
         <# ------------
@@ -170,11 +170,11 @@ if($subscriptions.Count -gt 0){
         Write-Verbose "--- Processing of Resources from Resource Group $($resourceGroupName.ResourceGroupName)"
         $resources = (Get-AzResource -ResourceGroupName $resourceGroupName.ResourceGroupName | Select-Object -Property Name, ResourceType, Location, ResourceId, Tags | Sort-Object Location, Name)
         Write-Verbose "--- $($resources.Count) Resource found"
-        if($resources.Count -gt 0){
-          foreach($resource in $resources){
+        if ($resources.Count -ne 0) {
+          foreach ($resource in $resources) {
             # Retrives Tags
-            if($resource.Tags.Count -gt 0){
-              foreach($key in $resource.Tags.keys){
+            if ($resource.Tags.Count -ne 0) {
+              foreach ($key in $resource.Tags.keys) {
                 $objRgResult += SetObjResult @($subscription.Name, $subscription.Id, $resourceGroupName.ResourceGroupName, $resource.Name, $resource.ResourceType, $resource.ResourceId, $resource.Location, $key, $resource.Tags[$key])
               }
             }
