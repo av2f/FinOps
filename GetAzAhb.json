@@ -1,7 +1,9 @@
 {
-  "pathResult": "D:/AzFinOps/Data/GetAzAhb/",
+  "pathResult": "C:/Users/fparment/Documents/AzFinOps/Data/GetAzAhb/",
   "fileResult": "GetAzAhb",
   "chronoFile": "Y",
+  "askConnected": "Y",
+  "subscriptions": "All",
   "osTypeFilter": "Windows",
   "hybridBenefit": {
     "licenseType": "Windows_Server",

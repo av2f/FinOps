@@ -1,5 +1,5 @@
 <#
-  Name    : Get-AllTags.ps1
+  Name    : Get-AzAllTags.ps1
   Author  : Frederic Parmentier
   Version : 1.0
   Creation Date : 02/01/2024
@@ -9,8 +9,8 @@
   Update done   :
 
   Retrieve Tags defined in Subscriptions, Resource Groups and Resources, and store them in 
-  .\GetAllTags\GetAllTagsmmddyyyyhhmmss.csv
-  For more information, type Get-Help .\Get-AllTags.ps1 [-detailed | -full]
+  .\GetAzAllTags\GetAzAllTagsmmddyyyyhhmmss.csv
+  For more information, type Get-Help .\Get-AzAllTags.ps1 [-detailed | -full]
 #>
 
 <# -----------
@@ -26,8 +26,8 @@ Set-Item -Path Env:\SuppressAzurePowerShellBreakingChangeWarnings -Value $true
 <# -----------
   Declare global variables, arrays and objects
 ----------- #>
-# Initiate result array
-# $arrayAllTags = @()
+# Retrieve global variables from json file
+$globalVar = Get-Content -Raw -Path ".\GetAzAllTags.json" | ConvertFrom-Json
 
 <# -----------
   Declare Functions
@@ -116,9 +116,15 @@ function SetObjResult {
 <# -----------
   Main Program
 ----------- #>
-# Create file name
-if ((CreateDirectoryResult 'GetAllTags')) {
-  $csvFile = '.\GetAllTags\' + (CreateChronoFile 'GetAllTags') + '.csv'
+# Create directory results if not exists and filename for results
+# if chronoFile is set to "Y", Create a chrono to the file with format MMddyyyyHHmmss
+if ((CreateDirectoryResult $globalVar.pathResult)) {
+  if ($globalVar.chronoFile.ToUpper() -eq "Y") {
+    $csvFile = $globalVar.pathResult + (CreateChronoFile $globalVar.fileResult) + '.csv'
+  }
+  else {
+    $csvFile = $globalVar.pathResult + $globalVar.fileResult + '.csv'
+  }
 }
 Write-Verbose "Starting processing..."
 # retrieve Subscriptions enabled
@@ -205,7 +211,7 @@ Write-Verbose "File $csvFile is available."
 
   .DESCRIPTION
   The Get-AllTags script searches all Tags defined in Subscriptions, Resource Groups and Resources; and store them 
-  in the file .\GetAllTags\GetAllTagsMMddyyyyHHmmss.csv.
+  in the file .\GetAzAllTags\GetAzAllTagsMMddyyyyHHmmss.csv.
   The format of .csv file is :
   SubscriptionName;SubscriptionId;ResourceGroup;Resource;ResourceId;Location;TagName;TagValue
   
@@ -217,11 +223,11 @@ Write-Verbose "File $csvFile is available."
   Optional : -Verbose to have progress informations on console
 
   .OUTPUTS
-  GetAllTagsMMddyyyyHHmmss.csv file with results.
+  GetAzAllTagsMMddyyyyHHmmss.csv file with results.
 
   .EXAMPLE
-  .\Get-AllTags.ps1
-  .\Get-AllTags.ps1 -Verbose : Execute script writing on console progress informations.
+  .\Get-AzAllTags.ps1
+  .\Get-AzAllTags.ps1 -Verbose : Execute script writing on console progress informations.
   
 
   .NOTES

@@ -85,6 +85,59 @@ function ReplaceEmpty
   return $checkStr
 }
 
+function CalcCores
+{
+  <#
+    Retrieve for VM with Hybrid Benefit number of:
+    - Cores consumed
+    - Licenses consumed
+    - Cores wasted
+    Input:
+      - $nbCores: number of cores of the VM
+      - $coresByLicense: Number of cores by license
+      - $licenseType: Type of License applied on VM
+    Output:
+      - $calcCores: array of results
+  #>
+  param(
+    [Int16] $nbCores,
+    [Int16] $coresByLicense,
+    [String] $licenseType
+  )
+
+  $calcCores = @{
+    coresConsumed = 0
+    licensesConsumed = 0
+    coresWasted = 0
+  }
+
+  $floor = [Math]::Floor($nbCores/$coresByLicense)
+  $modulus = $nbCores % $coresByLicense
+  # if License applied is Hybrid Benefit
+  if ($licenseType -eq $globalVar.hybridBenefit.name) {
+    if ($floor -eq 0 -or $nbCores -eq $coresByLicense) {
+      $calcCores['coresConsumed'] = $coresByLicense
+      $calcCores['licensesConsumed'] = 1
+      $calcCores['coresWasted'] = $coresByLicense - $nbCores
+    }
+    else {
+      switch ($modulus) {
+        { $_ -eq 0 } {
+          $calcCores['coresConsumed'] = $coresByLicense * $floor
+          $calcCores['licensesConsumed'] = $floor
+          $calcCores['coresWasted'] = 0
+        }
+        { $_ -gt 0 } {
+          $calcCores['coresConsumed'] = ($coresByLicense * $floor) + $coresByLicense
+          $calcCores['licensesConsumed'] = $floor + 1
+          $calcCores['coresWasted'] = ($coresByLicense * ($floor + 1)) - $nbCores
+        }
+      }
+    }
+  }
+  return $calcCores
+}
+
 function GetVmInfo
 {
   <#
@@ -165,7 +218,7 @@ function SetObjResult {
   param(
     [array] $listResult
   )
-  if ($listResult.Count -ne 16) {
+  if ($listResult.Count -ne 17) {
     $listResult = @('-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-',"-","-")
   }
   $objTagResult = @(
@@ -184,8 +237,9 @@ function SetObjResult {
       Ram = $listResult[11]
       tag_Environment = $listResult[12]
       tag_Availability = $listResult[13]
-      Cores_Consumed = $listResult[14]
-      Cores_Wasted = $listResult[15]
+      Nb_Cores_Consumed = $listResult[14]
+      Nb_Licenses_Consumed = $listResult[15]
+      Nb_Cores_Wasted = $listResult[16]
     }
   )
   return $objTagResult
@@ -288,14 +342,15 @@ if ($subscriptions.Count -ne 0) {
             # if there VM matching with $osTypeFilter
             if ($vmInfos.Count -ne 0) {
               # -- Retrieve VM sizing
-              $vmSizing = GetVmSizing -rgName $resourceGroupName.ResourceGroupName -vmName $vm.Name -sku $vmInfos[2] 
+              $vmSizing = GetVmSizing -rgName $resourceGroupName.ResourceGroupName -vmName $vm.Name -sku $vmInfos[2]
+              $resultCores = CalcCores -nbCores $vmSizing.NumberOfCores -coresByLicense $globalVar.weightLicenseInCores -licenseType $vmInfos[1]
               # Aggregate informations
               $objVmResult += SetObjResult @(
                 $subscription.Name, $subscription.Id, $resourceGroupName.ResourceGroupName,
                 $vm.Name, $vm.Location, $vm.PowerState,
                 $vmInfos[0], $vm.OsName, $vmInfos[1],
                 $vmInfos[2], $vmSizing.NumberOfCores, $vmSizing.MemoryInMB,
-                $vmInfos[3],$vmInfos[4],0,0
+                $vmInfos[3],$vmInfos[4],$resultCores['CoresConsumed'], $resultCores['licensesConsumed'], $resultCores['coresWasted']
               )
             }
           }
