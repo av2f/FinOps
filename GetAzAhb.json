@@ -2,6 +2,7 @@
   "pathResult": "C:/Users/fparment/Documents/AzFinOps/Data/GetAzAhb/",
   "fileResult": "GetAzAhb",
   "chronoFile": "Y",
+  "generateLogFile": "Y",
   "askConnected": "Y",
   "subscriptions": "All",
   "osTypeFilter": "Windows",

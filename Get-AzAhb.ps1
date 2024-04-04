@@ -1,7 +1,7 @@
 <#
   Name    : Get-AzAhb.ps1
   Author  : Frederic Parmentier
-  Version : 0.5
+  Version : 1.0
   Creation Date : 04/02/2024
   
   Updated date  :
@@ -9,7 +9,7 @@
   Update done   :
 
   Optimize OS Azure Hybrid Management
-  ..\Data\GetAzAhb\GetAzAhbmmddyyyyhhmmss.csv
+  ..\Data\GetAzAhb\GetAzAhb[mmddyyyyhhmmss].csv
   For more information, type Get-Help .\Get-AzAhb.ps1 [-detailed | -full]
 
   Global variables are stored in .\GetAzAhb.json and must be adapted accordingly
@@ -30,6 +30,10 @@ Set-Item -Path Env:\SuppressAzurePowerShellBreakingChangeWarnings -Value $true
 ----------- #>
 # Retrieve global variables from json file
 $globalVar = Get-Content -Raw -Path ".\GetAzAhb.json" | ConvertFrom-Json
+#
+$globalError = 0  # to count errors
+$globalChronoFile = (Get-Date -Format "MMddyyyyHHmmss") # Format for file with chrono
+$globalLog = $false # set to $true if generateLogFile in json file is set to "Y"
 
 <# -----------
   Declare Functions
@@ -37,49 +41,87 @@ $globalVar = Get-Content -Raw -Path ".\GetAzAhb.json" | ConvertFrom-Json
 function CreateDirectoryResult{
   <#
     Create Directory to store result files if not already existing
-    Input :
-      - $directory : directory name to create if not already existing
-    Output : 
+    Input:
+      - $directory: directory name to create if not already existing
+    Output: 
       - $True
   #>
   param(
-    [String] $directory
+    [String]$directory
   )
   if ((Test-Path -Path $directory) -eq $False) {
     New-Item -Path $directory -ItemType "directory"
   }
   return $True
 }
-function CreateChronoFile
+
+function CreateFile
 {
   <#
     Create file with chrono with format : <filename>.MMddyyyyHHmmss
-    Input :
-      - $fileName : File name to create chrono file 
-    Output : 
-      - File name with format $fileName.MMddyyyyHHmmss
+    Input:
+      - $pathName: Path where create file
+      - $fileName: File name
+      - $extension: Extension of file to create
+      - $chrono: Y|N - Specify if the file must be created with format $fileName.MMddyyyyHHmmss
+    Output: 
+      - $resFileName = File name accordingly options
+    Use the variable $globalChronoFile to set up the chrono
   #>
   param(
-    [String] $fileName
+    [String]$pathName,
+    [String]$fileName,
+    [String]$extension,
+    [String]$chrono
   )
-  $chrono = Get-Date -Format "MMddyyyyHHmmss"
-  $fileName += $chrono
-  return $fileName
+  $resFileName = ""
+  # if Chrono set to "Y"
+  if ($chrono.ToUpper() -eq "Y") {
+    $resFileName =$pathName + $fileName + $globalChronoFile + '.' + $extension
+  }
+  else {
+    # Remove file if already exists to create a new
+    $resFileName = $pathName + $fileName + "." + $extension 
+    if (Test-Path -Path $resFileName -PathType Leaf)
+    {
+      Remove-Item -Path $resFileName -Force
+    }
+  }
+  return $resFileName
+}
+
+function WriteLog
+{
+  <#
+    write in the log file with format : MM/dd/yyyy hh:mm:ss: message
+    Input:
+      - $fileName: Log file name
+      - $message: message to write
+    Output: 
+      - write in the log file $fileName
+  #>
+  param(
+    [string]$fileName,
+    [string]$message
+  )
+  $chrono = (Get-Date -Format "MM/dd/yyyy hh:mm:ss")
+  $line = $chrono + ": " + $message
+  Add-Content -Path $fileName -Value $line
 }
 
 function ReplaceEmpty
 {
   <#
     Replace an empty string by string given in parameter
-    Input :
-      - $checkStr : String to check
+    Input:
+      - $checkStr: String to check
       - $replacedBy: String to set up if $checkStr is empty
-    Output : 
+    Output: 
       - $checkStr
   #>
   param(
-    [String] $checkStr,
-    [String] $replacedBy
+    [String]$checkStr,
+    [String]$replacedBy
   )
   if ($checkStr -match "^\s*$") { $checkStr = $replacedBy }
   return $checkStr
@@ -100,9 +142,9 @@ function CalcCores
       - $calcCores: array of results
   #>
   param(
-    [Int16] $nbCores,
-    [Int16] $coresByLicense,
-    [String] $licenseType
+    [Int16]$nbCores,
+    [Int16]$coresByLicense,
+    [String]$licenseType
   )
 
   $calcCores = @{
@@ -114,7 +156,7 @@ function CalcCores
   $floor = [Math]::Floor($nbCores/$coresByLicense)
   $modulus = $nbCores % $coresByLicense
   # if License applied is Hybrid Benefit
-  if ($licenseType -eq $globalVar.hybridBenefit.name) {
+  if ($licenseType -eq $globalVar.hybridBenefit.License_Type) {
     if ($floor -eq 0 -or $nbCores -eq $coresByLicense) {
       $calcCores['coresConsumed'] = $coresByLicense
       $calcCores['licensesConsumed'] = 1
@@ -138,6 +180,37 @@ function CalcCores
   return $calcCores
 }
 
+function GetVmsFromRg
+{
+  <#
+    Retrieve for VMs from Resource group $rgName retrieving following VMs informations:
+    Name, Location, OsName, PowerState
+    filter by OsType = Windows
+    Input:
+      - $rgName: Resource Group Name
+    Output:
+      - $resVms: array of results
+  #>
+  param(
+    [String]$rgName
+  )
+
+  $resVms = @()
+  try {
+    $resVms = (
+          Get-AzVM -ResourceGroupName $resourceGroupName.ResourceGroupName -Status |
+          Select-Object -Property Name, Location, OsName, PowerState
+        )
+  }
+  catch {
+    Write-Host "An error occured retrieving VMs from Resource group $rgName"
+    if ($globalLog) { (WriteLog -fileName $logfile -message "ERROR: An error occured retrieving VMs from Resource group $rgName") }
+    $resVms = @('Error', 'Error', 'Error', 'Error')
+    $globalError += 1
+  }
+  return $resVms
+}
+
 function GetVmInfo
 {
   <#
@@ -151,8 +224,8 @@ function GetVmInfo
       - $resInfos: array of results
   #>
   param(
-    [String] $rgName,
-    [String] $vmName
+    [String]$rgName,
+    [String]$vmName
   )
   $resInfos = @()
   try {
@@ -167,16 +240,13 @@ function GetVmInfo
       # If Tags are empty, replaced by "-"
       $resInfos[3] = (ReplaceEmpty -checkStr $resInfos[3] -replacedBy "-")
       $resInfos[4] = (ReplaceEmpty -checkStr $resInfos[4] -replacedBy "-")
-      # search if Hybrid benefit or Virtual desktop license and replace name in $resInfos
-      switch ($resInfos[1].ToUpper()) {
-        $globalVar.hybridBenefit.licenseType.ToUpper() { $resInfos[1] = $globalVar.hybridBenefit.name }
-        $globalVar.virtualDesktop.licenseType.ToUpper() { $resInfos[1] = $globalVar.virtualDesktop.name}
-      }
     }
   }
   catch {
     Write-Host "An error occured retrieving VM informations for $vmName"
-    $resInfos = @("Error", "Error", "Error", "Error", "Error")
+    if ($globalLog) { (WriteLog -fileName $logfile -message "ERROR: An error occured retrieving VM informations for $vmName") }
+    $resInfos = @('Error', 'Error', 'Error', 'Error', 'Error')
+    $globalError += 1
   }
   return $resInfos
 }
@@ -193,9 +263,9 @@ function GetVmSizing
       - $resSizing: array of results
   #>
   param(
-    [String] $rgName,
-    [String] $vmName,
-    [String] $sku
+    [String]$rgName,
+    [String]$vmName,
+    [String]$sku
   )
   $resSizing = @()
   try {
@@ -206,20 +276,24 @@ function GetVmSizing
   }
   catch {
     Write-Host "An error occured retrieving VM informations for $vmName"
-    $resSizing = @("Error", "Error")
+    if ($globalLog) { (WriteLog -fileName $logfile -message "ERROR: An error occured retrieving VM informations for $vmName") }
+    $resSizing = @('Error', 'Error')
+    $globalError += 1
   }
   return $resSizing
 }
 
 function SetObjResult {
   <#
-    $listResult must contains 9 elements
+    Create Object array with informations contained in the array $listResult
+    Input: $listResult
+    Output: Object array with informations
   #>
   param(
-    [array] $listResult
+    [array]$listResult
   )
   if ($listResult.Count -ne 17) {
-    $listResult = @('-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-',"-","-")
+    $listResult = @('-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-','-','-')
   }
   $objTagResult = @(
     [PSCustomObject]@{
@@ -237,58 +311,60 @@ function SetObjResult {
       Ram = $listResult[11]
       tag_Environment = $listResult[12]
       tag_Availability = $listResult[13]
-      Nb_Cores_Consumed = $listResult[14]
-      Nb_Licenses_Consumed = $listResult[15]
-      Nb_Cores_Wasted = $listResult[16]
+      Nb_AHB_Cores_Consumed = $listResult[14]
+      Nb_AHB_Licenses_Consumed = $listResult[15]
+      Nb_AHB_Cores_Wasted = $listResult[16]
     }
   )
   return $objTagResult
 }
 #
-<# -----------
-  Main Program
------------ #>
+<# ------------------------------------------------------------------------
+Main Program
+--------------------------------------------------------------------------- #>
 # Create directory results if not exists and filename for results
-# if chronoFile is set to "Y", Create a chrono to the file with format MMddyyyyHHmmss
 if ((CreateDirectoryResult $globalVar.pathResult)) {
-  if ($globalVar.chronoFile.ToUpper() -eq "Y") {
-    $csvFile = $globalVar.pathResult + (CreateChronoFile $globalVar.fileResult) + '.csv'
-  }
-  else {
-    $csvFile = $globalVar.pathResult + $globalVar.fileResult + '.csv'
+  # Create the CSV file result
+  $csvResFile = (CreateFile -pathName $globalVar.pathResult -fileName $globalVar.fileResult -extension 'csv' -chrono $globalVar.chronoFile)
+  if ($globalVar.generateLogFile.ToUpper() -eq "Y") {
+    # Create log file
+    $globalLog = $true
+    $logfile = (CreateFile -pathName $globalVar.pathResult -fileName $globalVar.fileResult -extension 'log' -chrono $globalVar.chronoFile)
   }
 }
-
+if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Starting processing...") }
 Write-Verbose "Starting processing..."
+
 # ---- For Tests, use 1 subscription ----
 # retrieve Subscriptions enabled
 # $subscriptions = Get-AzSubscription | Where-Object -Property State -eq "Enabled"
 # $subscriptions = Get-AzSubscription | Where-Object {($_.Name -clike "*DXC*") -and ($_.State -eq "Enabled")}
 $subscriptions = @(
+  <#
   [PSCustomObject]@{
     Name = 'EA DXC Cloud Ops managed services for Alstom Prod'
     Id = 'c5ea61f3-1975-4b59-9e9c-66128b8989f3'
-  },
+  },#>
   [PSCustomObject]@{
     Name = 'EA DXC Cloud Ops managed services for Alstom'
     Id = 'a6e9693b-e3d6-4e21-a5ce-e32d948941f9'
-  },
+  }<#,
   [PSCustomObject]@{
     Name = 'EA DXC Cloud Ops managed services for Alstom Non-Prod'
     Id = '80f0f1bc-6d6f-4d58-a6ea-6a1aefb4bb21'
-  },
+  }
   [PSCustomObject]@{
     Name = 'EA C&C Reserved Instances'
     Id = '9b371cae-5572-48a9-a529-9972ae6a56cb'
-  },
+  }<#,
   [PSCustomObject]@{
     Name = 'EA DXC Cloud Ops managed services for Alstom VDE'
     Id = '82890a99-40b6-4702-9f65-7ef66eb4e908'
-  },
+  }
   [PSCustomObject]@{
     Name = 'EA C&C managed services for Alstom Prod'
     Id = 'd07ad70b-b32c-4090-a052-3023ecfdfa11'
-  }
+  } #>
 )
 
 <# --- For tests on 1 resourcegroup 
@@ -299,50 +375,57 @@ $resourceGroupNames = @(
 ) #>
 
 Write-Verbose "$($subscriptions.Count) subscriptions found."
+if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: $($subscriptions.Count) subscriptions found.") }
 if ($subscriptions.Count -ne 0) {
   foreach ($subscription in $subscriptions) {
     <# ------------
       Subscription processing
     ------------ #>
     # Set the context to use the specified subscription
+    if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Processing of the $($subscription.Name) subscription.") }
     Write-Verbose "- Processing of the $($subscription.Name) subscription."
     
     # ===== En commentaire pour tests =======
     # Set-AzContext -Subscription $subscription
     # ================
-    
-    Set-AzContext -Subscription $subscription.Id
-    
+   
     <# ------------
       ResourceGroup processing
     ------------ #>
+    if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Processing of Resource Groups from $($subscription.Name)") }
     Write-Verbose "-- Processing of Resource Groups from $($subscription.Name)"
+    
+    # Set to Subscription context
+    Set-AzContext -Subscription $subscription.id
+    # Retrieve Resource groups names from the subscription
     $resourceGroupNames = (Get-AzResourceGroup | Select-Object -Property ResourceGroupName | Sort-Object ResouceGroupName)
+    
+    if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: $($resourceGroupNames.Count) Resource Groups found") }
     Write-Verbose "-- $($resourceGroupNames.Count) Resource Groups found"
     if ($resourceGroupNames.Count -ne 0) {
       foreach ($resourceGroupName in $resourceGroupNames) {
         $objVmResult = @()
         $arrayVm = @()
-        #
         <# ------------
           VM processing
+          Retrieve VMs from Resource group $resourceGroupName
         ------------ #>
+        if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Processing of VMs from Resource Group $($resourceGroupName.ResourceGroupName)") }
         Write-Verbose "--- Processing of VMs from Resource Group $($resourceGroupName.ResourceGroupName)"
-        $vms = (
-          Get-AzVM -ResourceGroupName $resourceGroupName.ResourceGroupName -Status |
-          Select-Object -Property Name, Location, OsName, PowerState
-        )
-        Write-Verbose "--- $($vms.Count) VMs found"
-        #
+        $vms = GetVmsFromRg -rgName $resourceGroupName
         # if there are Virtual Machines
-        if ($vms.Count -ne 0) {
+        # as there is a bug with .count when only 1 VM, replace by "$vms | Measure-Object | ForEach-Object count"
+        if ($($vms | Measure-Object | ForEach-Object count) -ne 0) {
+          $windowsVm = 0
           foreach ($vm in $vms) {
             # -- Retrieve VM informations
             $vmInfos = GetVmInfo -rgName $resourceGroupName.ResourceGroupName -vmName $vm.Name
-            # if there VM matching with $osTypeFilter
+            # if VM matching with $globalVar.osTypeFilter
             if ($vmInfos.Count -ne 0) {
+              $windowsVm += 1
               # -- Retrieve VM sizing
               $vmSizing = GetVmSizing -rgName $resourceGroupName.ResourceGroupName -vmName $vm.Name -sku $vmInfos[2]
+              # -- Calculate Cores and Licenses for Hybrid Benefits
               $resultCores = CalcCores -nbCores $vmSizing.NumberOfCores -coresByLicense $globalVar.weightLicenseInCores -licenseType $vmInfos[1]
               # Aggregate informations
               $objVmResult += SetObjResult @(
@@ -354,21 +437,23 @@ if ($subscriptions.Count -ne 0) {
               )
             }
           }
+          if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: $windowsVm VMs Windows found and processed") }
+          Write-Verbose "--- $windowsVm VMs Windows found and processed"
         }
         # Write in results in result file
         $arrayVm += $objVmResult
-        $arrayVm | Export-Csv -Path $csvFile -Delimiter ";" -NoTypeInformation -Append
+        $arrayVm | Export-Csv -Path $csvResFile -Delimiter ";" -NoTypeInformation -Append
       }
     }
     Write-Verbose "---------------------------------------------"
   }
 }
-
-Write-Verbose "File $csvFile is available."
-
-# --------------- POUR TEST ------
-Get-Date
-# --------------- POUR TEST ------
+if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: File $csvResFile is available.") }
+Write-Verbose "File $csvResFile is available."
+if ($globalLog) {
+  (WriteLog -fileName $logfile -message "INFO: End processing with $globalError error(s)...") 
+  (WriteLog -fileName $logfile -message "INFO: return code: $LASTEXITCODE") 
+}
 
 <# -----------
   Get-Help Informations
