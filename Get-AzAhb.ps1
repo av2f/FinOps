@@ -152,11 +152,10 @@ function CalcCores
     licensesConsumed = 0
     coresWasted = 0
   }
-
   $floor = [Math]::Floor($nbCores/$coresByLicense)
   $modulus = $nbCores % $coresByLicense
   # if License applied is Hybrid Benefit
-  if ($licenseType -eq $globalVar.hybridBenefit.License_Type) {
+  if ($licenseType -eq $globalVar.hybridBenefit.LicenseType) {
     if ($floor -eq 0 -or $nbCores -eq $coresByLicense) {
       $calcCores['coresConsumed'] = $coresByLicense
       $calcCores['licensesConsumed'] = 1
