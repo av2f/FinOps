@@ -335,45 +335,11 @@ if ((CreateDirectoryResult $globalVar.pathResult)) {
 if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Starting processing...") }
 Write-Verbose "Starting processing..."
 
-# ---- For Tests, use 1 subscription ----
 # retrieve Subscriptions enabled
 # $subscriptions = Get-AzSubscription | Where-Object -Property State -eq "Enabled"
-# $subscriptions = Get-AzSubscription | Where-Object {($_.Name -clike "*DXC*") -and ($_.State -eq "Enabled")}
-$subscriptions = @(
-  <#
-  [PSCustomObject]@{
-    Name = 'EA DXC Cloud Ops managed services for Alstom Prod'
-    Id = 'c5ea61f3-1975-4b59-9e9c-66128b8989f3'
-  },#>
-  [PSCustomObject]@{
-    Name = 'EA DXC Cloud Ops managed services for Alstom'
-    Id = 'a6e9693b-e3d6-4e21-a5ce-e32d948941f9'
-  }<#,
-  [PSCustomObject]@{
-    Name = 'EA DXC Cloud Ops managed services for Alstom Non-Prod'
-    Id = '80f0f1bc-6d6f-4d58-a6ea-6a1aefb4bb21'
-  }
-  [PSCustomObject]@{
-    Name = 'EA C&C Reserved Instances'
-    Id = '9b371cae-5572-48a9-a529-9972ae6a56cb'
-  }<#,
-  [PSCustomObject]@{
-    Name = 'EA DXC Cloud Ops managed services for Alstom VDE'
-    Id = '82890a99-40b6-4702-9f65-7ef66eb4e908'
-  }
-  [PSCustomObject]@{
-    Name = 'EA C&C managed services for Alstom Prod'
-    Id = 'd07ad70b-b32c-4090-a052-3023ecfdfa11'
-  } #>
-)
-
-<# --- For tests on 1 resourcegroup 
-$resourceGroupNames = @(
-  [PSCustomObject]@{
-    ResourceGroupName = 'sdc3-08733-preprod-rg'
-  }
-) #>
-
+# For Tests = Only DXC Subcriptions
+$subscriptions = Get-AzSubscription | Where-Object { ($_.Name -clike "*DXC*") -and ($_.State -eq "Enabled") }
+# --
 Write-Verbose "$($subscriptions.Count) subscriptions found."
 if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: $($subscriptions.Count) subscriptions found.") }
 if ($subscriptions.Count -ne 0) {
@@ -384,22 +350,15 @@ if ($subscriptions.Count -ne 0) {
     # Set the context to use the specified subscription
     if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Processing of the $($subscription.Name) subscription.") }
     Write-Verbose "- Processing of the $($subscription.Name) subscription."
-    
-    # ===== En commentaire pour tests =======
-    # Set-AzContext -Subscription $subscription
-    # ================
-   
     <# ------------
       ResourceGroup processing
     ------------ #>
-    if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Processing of Resource Groups from $($subscription.Name)") }
-    Write-Verbose "-- Processing of Resource Groups from $($subscription.Name)"
-    
     # Set to Subscription context
     Set-AzContext -Subscription $subscription.id
+    if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Processing of Resource Groups from $($subscription.Name)") }
+    Write-Verbose "-- Processing of Resource Groups from $($subscription.Name)"
     # Retrieve Resource groups names from the subscription
     $resourceGroupNames = (Get-AzResourceGroup | Select-Object -Property ResourceGroupName | Sort-Object ResouceGroupName)
-    
     if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: $($resourceGroupNames.Count) Resource Groups found") }
     Write-Verbose "-- $($resourceGroupNames.Count) Resource Groups found"
     if ($resourceGroupNames.Count -ne 0) {
@@ -407,16 +366,16 @@ if ($subscriptions.Count -ne 0) {
         $objVmResult = @()
         $arrayVm = @()
         <# ------------
-          VM processing
+          VMs processing
           Retrieve VMs from Resource group $resourceGroupName
         ------------ #>
         if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Processing of VMs from Resource Group $($resourceGroupName.ResourceGroupName)") }
         Write-Verbose "--- Processing of VMs from Resource Group $($resourceGroupName.ResourceGroupName)"
         $vms = GetVmsFromRg -rgName $resourceGroupName
-        # if there are Virtual Machines
-        # as there is a bug with .count when only 1 VM, replace by "$vms | Measure-Object | ForEach-Object count"
+        # Continue if there are Virtual Machines
+        # as there is a bug with .Count when only 1 VM, replace by "$vms | Measure-Object | ForEach-Object count"
         if ($($vms | Measure-Object | ForEach-Object count) -ne 0) {
-          $windowsVm = 0
+          $windowsVm = 0  # Count number of Windows VM in the RG
           foreach ($vm in $vms) {
             # -- Retrieve VM informations
             $vmInfos = GetVmInfo -rgName $resourceGroupName.ResourceGroupName -vmName $vm.Name
