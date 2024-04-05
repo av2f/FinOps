@@ -352,6 +352,7 @@ Main Program
 if ((CreateDirectoryResult $globalVar.pathResult)) {
   # Create the CSV file result
   $csvResFile = (CreateFile -pathName $globalVar.pathResult -fileName $globalVar.fileResult -extension 'csv' -chrono $globalVar.chronoFile)
+  # if generateLogFile in Json file is set to "Y", create log file
   if ($globalVar.generateLogFile.ToUpper() -eq "Y") {
     # Create log file
     $globalLog = $true
@@ -449,27 +450,88 @@ if ($globalLog) {
 
 <#
   .SYNOPSIS
-  This script retrieves all Tags defined in Subscriptions, Resource Groups and Resources.
+  This script retrieves informations and perform calculation to optimize Azure Hybrid Benefit (AHB)
 
   .DESCRIPTION
-  The Get-AllTags script searches all Tags defined in Subscriptions, Resource Groups and Resources; and store them 
-  in the file .\GetAllTags\GetAllTagsMMddyyyyHHmmss.csv.
-  The format of .csv file is :
-  SubscriptionName;SubscriptionId;ResourceGroup;Resource;ResourceId;Location;TagName;TagValue
-  
-  Prerequisites :
+  The Get-AzAhb script creates the GetAzAhb[mmddyyyyhhmmss].csv file retrieving informations below for each Windows VMs:
+  - Subscription Name
+  - Subscription ID
+  - Resource Groups Name
+  - VM Name
+  - Location
+  - PowerState
+  - Os Type
+  - Os Name
+  - License Type (Windows_Server when AHB applied)
+  - VM Size
+  - Number of cores and RAM in MB
+  - Tag Environment if existing
+  - Tag Availability if existing
+
+  In addition, there are 3 calculated columns for VMs for which AHB is applied:
+  - Number of AHB cores consumed
+  - Number of AHB licenses consumed
+  - Number of AHB cores wasted
+     
+  Prerequisites:
   - Az module must be installed
   - before running the script, connect to Azure with the cmdlet "Connect-AzAccount"
+
+  Parameters: GetAzAhb.json file
+  the GetAzAhb.json file allows to adapt script to context.
+  Parameters are:
+  - pathResult:
+    - Directory where to store results.
+    - Format : "C:/Path/subPath/.../"
+  
+    - fileResult: name of result file and log file (by default, GetAzAhb)
+  
+    - chronoFile: Y|N.
+    - Set to "Y" if you want a chrono in the name of the file.
+    - Format: mmddyyyyhhmmss
+  
+    - generateLogFile: Y|N. Set to "Y" if you want a log file
+  
+  - checkIfLogIn: Y|N. Set to "Y" if you want to check if log in to Azure is done
+  
+  - subscriptions: All|.csv file.
+    - if you set "Y", process all subscription
+    - if you set a .csv file, process subscriptions in file
+      - format must be: subscription Name,Subscription ID
+      - example if you set a file: "C:/data/subscriptions.csv"
+  
+  - osTypeFilter: Os Type to filter. by default "Windows"
+  - hybridBenefit: {
+    "licenseType": "Windows_Server",
+    "name": "Hybrid Benefit"
+  }
+    - Indicates LicenseType to match with AHB
+  
+    - virtualDesktop: {
+    "licenseType": "Windows_Client",
+    "name": "Azure Virtual Desktop"
+  }
+    - Indicates LicenseType to match with Azure Virtual Desktop
+  
+  - weightLicenseInCores: Indicates the number of cores for 1 AHB License (by default 8)
+  
+  - tags: {
+    "environment": "Environment",
+    "availability": "ServiceWindows"
+  }
+    - Tag Environment defined in Azure
+    - Tag Availability defined in Azure
 
   .INPUTS
   Optional : -Verbose to have progress informations on console
 
   .OUTPUTS
-  GetAllTagsMMddyyyyHHmmss.csv file with results.
+  GetAzAhb[MMddyyyyHHmmss].csv file with results.
+  Optional: GetAzAhb[MMddyyyyHHmmss].log file with detailed log.
 
   .EXAMPLE
-  .\Get-AllTags.ps1
-  .\Get-AllTags.ps1 -Verbose : Execute script writing on console progress informations.
+  .\Get-AzAhb.ps1
+  .\Get-AzAhb.ps1 -Verbose : Execute script writing on console progress informations.
   
 
   .NOTES

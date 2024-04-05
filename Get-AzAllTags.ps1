@@ -1,15 +1,17 @@
 <#
   Name    : Get-AzAllTags.ps1
   Author  : Frederic Parmentier
-  Version : 1.0
+  Version : 1.1
   Creation Date : 02/01/2024
   
-  Updated date  :
-  Updated by    :
-  Update done   :
+  Updated date  : 04/05/2024
+  Updated by    : F. Parmentier
+  Update done   : 
+    - Re-design script by functions
+    - Add Json parameter file
 
   Retrieve Tags defined in Subscriptions, Resource Groups and Resources, and store them in 
-  .\GetAzAllTags\GetAzAllTagsmmddyyyyhhmmss.csv
+  .\GetAzAllTags\GetAzAllTags[mmddyyyyhhmmss].csv
   For more information, type Get-Help .\Get-AzAllTags.ps1 [-detailed | -full]
 #>
 
@@ -89,7 +91,9 @@ function GetTags
 }
 function SetObjResult {
   <#
-    $listResult must contains 9 elements
+    Create Object array with informations contained in the array $listResult
+    Input: $listResult
+    Output: Object array with informations
   #>
   param(
     [array] $listResult
@@ -112,18 +116,19 @@ function SetObjResult {
   )
   return $objTagResult
 }
-
-<# -----------
-  Main Program
------------ #>
+#
+<# ------------------------------------------------------------------------
+Main Program
+--------------------------------------------------------------------------- #>
 # Create directory results if not exists and filename for results
-# if chronoFile is set to "Y", Create a chrono to the file with format MMddyyyyHHmmss
 if ((CreateDirectoryResult $globalVar.pathResult)) {
-  if ($globalVar.chronoFile.ToUpper() -eq "Y") {
-    $csvFile = $globalVar.pathResult + (CreateChronoFile $globalVar.fileResult) + '.csv'
-  }
-  else {
-    $csvFile = $globalVar.pathResult + $globalVar.fileResult + '.csv'
+  # Create the CSV file result
+  $csvResFile = (CreateFile -pathName $globalVar.pathResult -fileName $globalVar.fileResult -extension 'csv' -chrono $globalVar.chronoFile)
+  # if generateLogFile in Json file is set to "Y", create log file
+  if ($globalVar.generateLogFile.ToUpper() -eq "Y") {
+    # Create log file
+    $globalLog = $true
+    $logfile = (CreateFile -pathName $globalVar.pathResult -fileName $globalVar.fileResult -extension 'log' -chrono $globalVar.chronoFile)
   }
 }
 Write-Verbose "Starting processing..."
