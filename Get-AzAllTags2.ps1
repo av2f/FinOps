@@ -185,6 +185,36 @@ function SetObjResult {
   )
   return $objTagResult
 }
+
+function GetSubscriptionTags
+{
+   <#
+    Retrieve pair Tag Name / Tag Value
+    Input :
+      - subscription: subscription Name and ID for which the tag must be sought
+    Output : Object Table with pair Tag Name / Tag Value
+  #>
+  param(
+    [Object[]]$subscription
+  )
+  $subscriptionTags = @()
+  $listTags = @()
+  # Retrieve Tags for the subscription
+  $listTags = (GetTags -subscriptionId $subscription.Id)
+  # If there is at least 1 tag
+  if ($listTags.Count -ne 0) {
+    # Store each tags (key/value) in $subscriptionTags
+    foreach ($key in $listTags.keys) {
+      $subscriptionTags += (SetObjResult @($subscription.Name, $subscription.Id, '', '', 'Subscription', '', '', $key, $listTags[$key]))
+    }
+  }
+  # Store empty line
+  else{
+    $subscriptionTags += SetObjResult @($subscription.Name, $subscription.Id, '', '', 'Subscription', '', '', '-', '-')
+  }
+  return $subscriptionTags
+}
+
 #
 <# ------------------------------------------------------------------------
 Main Program
@@ -214,9 +244,8 @@ Write-Verbose "$($subscriptions.Count) subscriptions found."
 if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: $($subscriptions.Count) subscriptions found.") }
 if ($subscriptions.Count -ne 0) {
   foreach ($subscription in $subscriptions) {
-    # Initate arrays
-    $objSubResult = @()
-    $arraySubTags = @()
+    # Initate array Result
+    $arraySubscriptionTags = @()
     <# ------------
       Subscription processing
     ------------ #>
@@ -224,16 +253,9 @@ if ($subscriptions.Count -ne 0) {
     if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Processing of the $($subscription.Name) subscription.") }
     Write-Verbose "- Processing of the $($subscription.Name) subscription."
     Set-AzContext -Subscription $subscription.Id
-    # Retrieve subscription tags
-    $listTags = (GetTags -subscriptionId $subscription.Id)
-    if ($listTags.Count -ne 0) {
-      foreach ($key in $listTags.keys) {
-        $objSubResult += SetObjResult @($subscription.Name, $subscription.Id, '', '', 'Subscription', '', '', $key, $listTags[$key])
-      }
-    }
-    else{
-      $objSubResult += SetObjResult @($subscription.Name, $subscription.Id, '', '', 'Subscription', '', '', '-', '-')
-    }
+    # Retrieve subscription tags and write them in csv file
+    $arraySubscriptionTags += (GetSubscriptionTags -subscription $subscription)
+    $arraySubscriptionTags | Export-Csv -Path $csvResFile -Delimiter ";" -NoTypeInformation -Append
     <# ------------
       ResourceGroup processing
     ------------ #>

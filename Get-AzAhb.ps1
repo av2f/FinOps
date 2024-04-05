@@ -381,11 +381,10 @@ if ($subscriptions.Count -ne 0) {
     # Set the context to use the specified subscription
     if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Processing of the $($subscription.Name) subscription.") }
     Write-Verbose "- Processing of the $($subscription.Name) subscription."
+    Set-AzContext -Subscription $subscription.Id
     <# ------------
       ResourceGroup processing
     ------------ #>
-    # Set to Subscription context
-    Set-AzContext -Subscription $subscription.id
     if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Processing of Resource Groups from $($subscription.Name)") }
     Write-Verbose "-- Processing of Resource Groups from $($subscription.Name)"
     # Retrieve Resource groups names from the subscription
