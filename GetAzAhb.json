@@ -3,7 +3,7 @@
   "fileResult": "GetAzAhb",
   "chronoFile": "Y",
   "generateLogFile": "Y",
-  "askConnected": "Y",
+  "checkIfLogIn": "Y",
   "subscriptions": "All",
   "osTypeFilter": "Windows",
   "hybridBenefit": {

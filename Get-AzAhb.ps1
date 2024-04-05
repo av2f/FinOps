@@ -55,6 +55,33 @@ function CreateDirectoryResult{
   return $True
 }
 
+function CheckIfLogIn
+{
+  <#
+    Check if already login to Azure
+    If not the case, ask to login
+    Input:
+      - None
+    Output:
+      - $True
+  #>
+
+  # Check if already log in
+  $context = Get-AzContext
+
+  if (!$context)
+  {
+      Write-Host "Prior, you must connect to Azure Portal"
+      if ($globalLog) { (WriteLog -fileName $logfile -message "WARNING: Not yet connected to Azure") }
+      Connect-AzAccount  
+  }
+  else
+  {
+    Write-Host "Already connected to Azure"
+    if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Already connected to Azure") }
+  }
+}
+
 function CreateFile
 {
   <#
@@ -237,8 +264,8 @@ function GetVmInfo
     )
     if ($resInfos.count -ne 0) {
       # If Tags are empty, replaced by "-"
-      $resInfos[3] = (ReplaceEmpty -checkStr $resInfos[3] -replacedBy "-")
-      $resInfos[4] = (ReplaceEmpty -checkStr $resInfos[4] -replacedBy "-")
+      # $resInfos[3] = (ReplaceEmpty -checkStr $resInfos[3] -replacedBy "-")
+      # $resInfos[4] = (ReplaceEmpty -checkStr $resInfos[4] -replacedBy "-")
     }
   }
   catch {
@@ -333,11 +360,15 @@ if ((CreateDirectoryResult $globalVar.pathResult)) {
 }
 if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Starting processing...") }
 Write-Verbose "Starting processing..."
+# if variable checkIfLogIn in json file is set to "Y", Check if log in to Azure
+if ($globalVar.checkIfLogIn.ToUpper() -eq "Y") { CheckIfLogIn }
 
+# =================== FAIRE LA GESTION DES SOUSCRIPTIONS EN FONCTION DE subscriptions dans json
+# si "ALL" toutes les souscriptions, sinon fichier csv avec souscription name, souscription id
 # retrieve Subscriptions enabled
-# $subscriptions = Get-AzSubscription | Where-Object -Property State -eq "Enabled"
+$subscriptions = Get-AzSubscription | Where-Object -Property State -eq "Enabled"
 # For Tests = Only DXC Subcriptions
-$subscriptions = Get-AzSubscription | Where-Object { ($_.Name -clike "*DXC*") -and ($_.State -eq "Enabled") }
+# $subscriptions = Get-AzSubscription | Where-Object { ($_.Name -clike "*DXC*") -and ($_.State -eq "Enabled") }
 # --
 Write-Verbose "$($subscriptions.Count) subscriptions found."
 if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: $($subscriptions.Count) subscriptions found.") }
@@ -410,7 +441,6 @@ if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: File $csvResFile 
 Write-Verbose "File $csvResFile is available."
 if ($globalLog) {
   (WriteLog -fileName $logfile -message "INFO: End processing with $globalError error(s)...") 
-  (WriteLog -fileName $logfile -message "INFO: return code: $LASTEXITCODE") 
 }
 
 <# -----------

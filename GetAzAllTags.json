@@ -2,5 +2,7 @@
   "pathResult": "C:/Users/fparment/Documents/AzFinOps/Data/GetAzAllTags/",
   "fileResult": "GetAzAllTags",
   "chronoFile": "Y",
+  "generateLogFile": "Y",
+  "checkIfLogIn": "Y",
   "subscriptions": "All"
 }
