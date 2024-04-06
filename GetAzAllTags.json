@@ -4,6 +4,9 @@
   "chronoFile": "Y",
   "generateLogFile": "Y",
   "checkIfLogIn": "Y",
-  "subscriptions": "All",
+  "subscriptionsScope": {
+    "scope": "C:/Users/fparment/Documents/AzFinOps/Data/Alstom/subscriptions.csv",
+    "delimiter": ";"
+  },
   "saveEvery": 100
 }

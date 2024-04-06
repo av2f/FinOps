@@ -206,6 +206,45 @@ function CalcCores
   return $calcCores
 }
 
+function GetSubscriptions
+{
+  <#
+    Retrieve subcriptions
+    Input :
+      - $scope: Object table parameter subscriptionsScope in Json parameter file
+    Output :
+      - Object Table with Subscription Name and Subscription Id
+  #>
+  param(
+    [Object[]]$scope
+  )
+  $listSubscriptions = @()
+  if ($scope.scope -eq "All") {
+    # Retrieve all subscriptions enabled
+    $listSubscriptions = (Get-AzSubscription | Where-Object -Property State -eq "Enabled")
+  }
+  else {
+    # $scope.scope is .csv file with 2 columns: Name, Id
+    # Check if file exists
+    if (Test-Path -Path $scope.scope -PathType Leaf) {
+      # Retrieve Subscriptions in .csv file
+      $listSubscriptions = Import-Csv -Path $scope.scope -Delimiter $scope.delimiter
+    }
+    else {
+      Write-Host "Error: The file defined for subscriptions in Json parameter file was not found."
+      Write-Host "Error: Current value is $($scope.scope)"
+      Write-Host "Error: Change the parameter in Json parameter file or load the file with right path and name and restart the script."
+      if ($globalLog) { 
+        (WriteLog -fileName $logfile -message "ERROR : The file defined for subscriptions in Json parameter file was not found." )
+        (WriteLog -fileName $logfile -message "ERROR : Current value is $($scope.scope)" )
+        (WriteLog -fileName $logfile -message "ERROR : Change the parameter in Json parameter file or load the file with right path and name and restart the script." )
+        exit 1
+      }
+    }
+    return $listSubscriptions
+  }
+}
+
 function GetVmsFromRg
 {
   <#
@@ -364,10 +403,8 @@ Write-Verbose "Starting processing..."
 # if variable checkIfLogIn in json file is set to "Y", Check if log in to Azure
 if ($globalVar.checkIfLogIn.ToUpper() -eq "Y") { CheckIfLogIn }
 
-# =================== FAIRE LA GESTION DES SOUSCRIPTIONS EN FONCTION DE subscriptions dans json
-# si "ALL" toutes les souscriptions, sinon fichier csv avec souscription name, souscription id
-# retrieve Subscriptions enabled
-$subscriptions = Get-AzSubscription | Where-Object -Property State -eq "Enabled"
+# retrieve Subscriptions
+$subscriptions = (GetSubscriptions -scope $globalVar.subscriptionsScope)
 # For Tests = Only DXC Subcriptions
 # $subscriptions = Get-AzSubscription | Where-Object { ($_.Name -clike "*DXC*") -and ($_.State -eq "Enabled") }
 # --
