@@ -185,12 +185,94 @@ function SetObjResult {
   )
   return $objTagResult
 }
+
+function GetSubscriptionTags
+{
+   <#
+    Retrieve pair Tag Name / Tag Value for subcriptions
+    Input :
+      - $subscription: Object table of subscription for which tags must be sought
+    Output : Object Table with pair Tag Name / Tag Value
+  #>
+  param(
+    [Object[]]$subscription
+  )
+  $subscriptionTags = @()
+  $listTags = @()
+  # Retrieve Tags for the subscription
+  $listTags = (GetTags -subscriptionId $subscription.Id)
+  # If there is at least 1 tag
+  if ($listTags.Count -ne 0) {
+    # Store each tags (key/value) in $subscriptionTags
+    foreach ($key in $listTags.keys) {
+      $subscriptionTags += (SetObjResult @($subscription.Name, $subscription.Id, '', '', 'Subscription', '', '', $key, $listTags[$key]))
+    }
+  }
+  # Store empty line
+  else{
+    $subscriptionTags += SetObjResult @($subscription.Name, $subscription.Id, '', '', 'Subscription', '', '', '-', '-')
+  }
+  return $subscriptionTags
+}
+
+function GetResourceGroupTags
+{
+  <#
+    Retrieve pair Tag Name / Tag Value for resource groups
+    Input :
+      - $subscription: subscription of the resource Group
+      - $resourceGroup: Object table that contains resource group informations for which tags must be sought
+    Output : Object Table with pair Tag Name / Tag Value
+  #>
+  param(
+    [Object[]]$subscription,
+    [Object[]]$resourceGroup
+  )
+  $resourceGroupTags = @()
+  if ($resourceGroup.Tags.Count -ne 0) {
+    foreach ($key in $resourceGroup.Tags.keys) {
+      $resourceGroupTags += (SetObjResult @($subscription.Name, $subscription.Id, $resourceGroup.ResourceGroupName, '', 'Resource Group', $resourceGroup.ResourceId, $resourceGroup.Location, $key, $resourceGroup.Tags[$key]))
+    }
+  }
+  else {
+    $resourceGroupTags += (SetObjResult @($subscription.Name, $subscription.Id, $resourceGroup.ResourceGroupName, '', 'Resource Group', $resourceGroup.ResourceId, $resourceGroup.Location, '-', '-'))
+  }
+  return $resourceGroupTags
+}
+
+function GetResourceTags 
+{
+  <#
+    Retrieve pair Tag Name / Tag Value for resources
+    Input :
+      - $subscription: Subscription of the resource group
+      - $resourceGroupName: Resource Group name of resource
+      - $resource: Object that contains resource informations for which tags must be sought
+    Output : Object Table with pair Tag Name / Tag Value
+  #>
+  param(
+    [Object[]]$subscription,
+    [String]$resourceGroupName,
+    [Object[]]$resource
+  )
+  $resourceTags = @()
+  if ($resource.Tags.Count -ne 0) {
+    foreach ($key in $resource.Tags.keys) {
+      $resourceTags += SetObjResult @($subscription.Name, $subscription.Id, $resourceGroupName, $resource.Name, $resource.ResourceType, $resource.ResourceId, $resource.Location, $key, $resource.Tags[$key])
+    }
+  }
+  else{
+    $resourceTags += SetObjResult @($subscription.Name, $subscription.Id, $resourceGroupName, $resource.Name, $resource.ResourceType, $resource.ResourceId, $resource.Location, '-', '-')
+  }
+  return $resourceTags
+}
+
 #
 <# ------------------------------------------------------------------------
 Main Program
 --------------------------------------------------------------------------- #>
 # Create directory results if not exists and filename for results
-if ((CreateDirectoryResult $globalVar.pathResult)) {
+if ( (CreateDirectoryResult $globalVar.pathResult) ) {
   # Create the CSV file result
   $csvResFile = (CreateFile -pathName $globalVar.pathResult -fileName $globalVar.fileResult -extension 'csv' -chrono $globalVar.chronoFile)
   # if generateLogFile in Json file is set to "Y", create log file
@@ -204,7 +286,19 @@ if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Starting processi
 Write-Verbose "Starting processing..."
 # if variable checkIfLogIn in json file is set to "Y", Check if log in to Azure
 if ($globalVar.checkIfLogIn.ToUpper() -eq "Y") { CheckIfLogIn }
-
+# Check if variable saveEvery in json file parameter is greater or equal than 10, else stop script
+if ($globalVar.saveEvery -lt 10) {
+  Write-Host "Error: SaveEvery in json parameter file must greater or equal than 10"
+  Write-Host "Error: Current value is $($globalVar.saveEvery)"
+  Write-Host "Error: Change the value and restart the script"
+  if ($globalLog) { 
+    (WriteLog -fileName $logfile -message "ERROR : Value of saveEvery must be greater or equal than 10" )
+    (WriteLog -fileName $logfile -message "ERROR : Current value is $($globalVar.saveEvery)" )
+    (WriteLog -fileName $logfile -message "ERROR : Change the value and restart the script" )
+    (WriteLog -fileName $logfile -message "ERROR : script stopped" )
+  }
+  exit 1
+}
 # =================== FAIRE LA GESTION DES SOUSCRIPTIONS EN FONCTION DE subscriptions dans json
 # si "ALL" toutes les souscriptions, sinon fichier csv avec souscription name,souscription id
 # retrieve Subscriptions enabled
@@ -214,9 +308,8 @@ Write-Verbose "$($subscriptions.Count) subscriptions found."
 if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: $($subscriptions.Count) subscriptions found.") }
 if ($subscriptions.Count -ne 0) {
   foreach ($subscription in $subscriptions) {
-    # Initate arrays
-    $objSubResult = @()
-    $arraySubTags = @()
+    # Initate array Result
+    $arrayTags = @()
     <# ------------
       Subscription processing
     ------------ #>
@@ -224,63 +317,55 @@ if ($subscriptions.Count -ne 0) {
     if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Processing of the $($subscription.Name) subscription.") }
     Write-Verbose "- Processing of the $($subscription.Name) subscription."
     Set-AzContext -Subscription $subscription.Id
-    # Retrieve subscription tags
-    $listTags = (GetTags -subscriptionId $subscription.Id)
-    if ($listTags.Count -ne 0) {
-      foreach ($key in $listTags.keys) {
-        $objSubResult += SetObjResult @($subscription.Name, $subscription.Id, '', '', 'Subscription', '', '', $key, $listTags[$key])
-      }
-    }
-    else{
-      $objSubResult += SetObjResult @($subscription.Name, $subscription.Id, '', '', 'Subscription', '', '', '-', '-')
-    }
+    # Retrieve subscription tags and write in result file
+    $arrayTags += (GetSubscriptionTags -subscription $subscription)
+    $arrayTags | Export-Csv -Path $csvResFile -Delimiter ";" -NoTypeInformation -Append
     <# ------------
       ResourceGroup processing
     ------------ #>
     if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Processing of Resource Groups from $($subscription.Name)") }
     Write-Verbose "-- Processing of Resource Groups from $($subscription.Name)"
-    $resourceGroupNames = (Get-AzResourceGroup | Select-Object -Property ResourceGroupName, Location, Tags, ResourceId | Sort-Object Location, ResouceGroupName)
-    if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: $($resourceGroupNames.Count) Resource Groups found") }
-    Write-Verbose "-- $($resourceGroupNames.Count) Resource Groups found"
-    if ($resourceGroupNames.Count -ne 0) {
-      foreach ($resourceGroupName in $resourceGroupNames) {
-        $objRgResult = @()
-        $arrayRgTags = @()
-        # Retrives Tags
-        if ($resourceGroupName.Tags.Count -ne 0) {
-          foreach ($key in $resourceGroupName.Tags.keys) {
-            $objRgResult += SetObjResult @($subscription.Name, $subscription.Id, $resourceGroupName.ResourceGroupName, '', 'Resource Group', $resourceGroupName.ResourceId, $resourceGroupName.Location, $key, $resourceGroupName.Tags[$key])
-          }
-        }
-        else {
-          $objRgResult += SetObjResult @($subscription.Name, $subscription.Id, $resourceGroupName.ResourceGroupName, '', 'Resource Group', $resourceGroupName.ResourceId, $resourceGroupName.Location, '-', '-')
-        }
+    $resourceGroups = (Get-AzResourceGroup | Select-Object -Property ResourceGroupName, Location, Tags, ResourceId | Sort-Object Location, ResouceGroupName)
+    if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: $($resourceGroups.Count) Resource Groups found") }
+    Write-Verbose "-- $($resourceGroups.Count) Resource Groups found"
+    
+    if ($resourceGroups.Count -ne 0) {
+      foreach ($resourceGroup in $resourceGroups) {
+        $arrayTags = @()
+        # Retrieve resource group Tags and write in result file
+        $arrayTags += (GetResourceGroupTags -subscription $subscription -ResourceGroup $resourceGroup)
+        $arrayTags | Export-Csv -Path $csvResFile -Delimiter ";" -NoTypeInformation -Append
         <# ------------
           Resources processing
         ------------ #>
-        if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Processing of Resources from Resource Group $($resourceGroupName.ResourceGroupName)") }
-        Write-Verbose "--- Processing of Resources from Resource Group $($resourceGroupName.ResourceGroupName)"
-        $resources = (Get-AzResource -ResourceGroupName $resourceGroupName.ResourceGroupName | Select-Object -Property Name, ResourceType, Location, ResourceId, Tags | Sort-Object Location, Name)
-        Write-Verbose "--- $($resources.Count) Resource found"
-        if ($resources.Count -ne 0) {
+        if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Processing of Resources from Resource Group $($resourceGroup.ResourceGroupName)") }
+        Write-Verbose "--- Processing of Resources from Resource Group $($resourceGroup.ResourceGroupName)"
+        $resources = (Get-AzResource -ResourceGroupName $resourceGroup.ResourceGroupName | Select-Object -Property Name, ResourceType, Location, ResourceId, Tags | Sort-Object Location, Name)
+        # as there is a bug with .Count when only 1 resource, replace by "$resources | Measure-Object | ForEach-Object count"
+        $numberOfResources = $($resources | Measure-Object | ForEach-Object count)
+        
+        if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: $($numberOfResources) Resources found") }
+        Write-Verbose "--- $($numberOfResources) Resources found"
+        
+        if ($numberOfResources -ne 0) {
+          # if ($resources.Count -ne 0) {
+          $arrayTags = @()
+          $countResource = 0
           foreach ($resource in $resources) {
-            # Retrives Tags
-            if ($resource.Tags.Count -ne 0) {
-              foreach ($key in $resource.Tags.keys) {
-                $objRgResult += SetObjResult @($subscription.Name, $subscription.Id, $resourceGroupName.ResourceGroupName, $resource.Name, $resource.ResourceType, $resource.ResourceId, $resource.Location, $key, $resource.Tags[$key])
-              }
-            }
-            else{
-              $objRgResult += SetObjResult @($subscription.Name, $subscription.Id, $resourceGroupName.ResourceGroupName, $resource.Name, $resource.ResourceType, $resource.ResourceId, $resource.Location, '-', '-')
+            $arrayTags += (GetResourceTags -subscription $subscription -resourceGroupName $resourceGroup.ResourceGroupName -resource $resource)
+            $countResource += 1
+            # if number of resources = SaveEvery in json file parameter, write in the result file and re-initiate the array and counter
+            if ($countResource -eq $globalVar.saveEvery) {
+              $arrayTags | Export-Csv -Path $csvResFile -Delimiter ";" -NoTypeInformation -Append
+              $arrayTags = @()
+              $countResource = 0
             }
           }
+          # Write last resources
+          if ($countResource -gt 0) { $arrayTags | Export-Csv -Path $csvResFile -Delimiter ";" -NoTypeInformation -Append }
         }
-        $arrayRgTags += $objRgResult
-        $arrayRgTags | Export-Csv -Path $csvResFile -Delimiter ";" -NoTypeInformation -Append
       }
     }
-    $arraySubTags += $objSubResult
-    $arraySubTags | Export-Csv -Path $csvResFile -Delimiter ";" -NoTypeInformation -Append
     Write-Verbose "---------------------------------------------"
   }
 }
@@ -296,23 +381,57 @@ if ($globalLog) {
 
 <#
   .SYNOPSIS
-  This script retrieves all Tags defined in Subscriptions, Resource Groups and Resources.
+  This script retrieves all pairs Key/Value Tags defined in Subscriptions, Resource Groups and Resources.
 
   .DESCRIPTION
-  The Get-AllTags script searches all Tags defined in Subscriptions, Resource Groups and Resources; and store them 
-  in the file .\GetAzAllTags\GetAzAllTagsMMddyyyyHHmmss.csv.
-  The format of .csv file is :
-  SubscriptionName;SubscriptionId;ResourceGroup;Resource;ResourceId;Location;TagName;TagValue
+  The Get-AzAhb script creates the GetAzAhb[mmddyyyyhhmmss].csv file retrieving informations below for each Windows VMs:
+  - Subscription Name
+  - Subscription ID
+  - Resource Group Name
+  - Resource Name
+  - Resource Type
+  - Resource ID
+  - Location
+  - Tag Name (Key)
+  - Tag Value
   
   Prerequisites :
   - Az module must be installed
   - before running the script, connect to Azure with the cmdlet "Connect-AzAccount"
 
+  Parameters: GetAzAhb.json file
+  the GetAzAllTags.json file allows to adapt script to context.
+  Parameters are:
+  - pathResult:
+    - Directory where to store results.
+    - Format : "C:/Path/subPath/.../"
+  
+    - fileResult: name of result file and log file (by default, GetAzAhb)
+  
+    - chronoFile: Y|N.
+    - Set to "Y" if you want a chrono in the name of the file.
+    - Format: mmddyyyyhhmmss
+  
+    - generateLogFile: Y|N. Set to "Y" if you want a log file
+  
+  - checkIfLogIn: Y|N. Set to "Y" if you want to check if log in to Azure is done
+
+  - subscriptions: All|.csv file.
+    - if you set "Y", process all subscription
+    - if you set a .csv file, process subscriptions in file
+      - format must be: subscription Name,Subscription ID
+      - example if you set a file: "C:/data/subscriptions.csv"
+
+  - saveEvery: Indicates how many resources should be written at the same time to the result file
+    - by default value is 100 and minimum tolerated value is 10
+    - If you have less memory available, reduce the value.
+
   .INPUTS
   Optional : -Verbose to have progress informations on console
 
   .OUTPUTS
-  GetAzAllTagsMMddyyyyHHmmss.csv file with results.
+  GetAzAllTags[MMddyyyyHHmmss].csv file with results.
+  Optional: GetAzAllTags[MMddyyyyHHmmss].log file with detailed log.
 
   .EXAMPLE
   .\Get-AzAllTags.ps1

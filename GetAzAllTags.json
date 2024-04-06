@@ -4,5 +4,6 @@
   "chronoFile": "Y",
   "generateLogFile": "Y",
   "checkIfLogIn": "Y",
-  "subscriptions": "All"
+  "subscriptions": "All",
+  "saveEvery": 100
 }
