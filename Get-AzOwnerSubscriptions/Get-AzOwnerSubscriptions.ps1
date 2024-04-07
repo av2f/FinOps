@@ -58,33 +58,6 @@ function CreateDirectoryResult{
   return $True
 }
 
-function CheckIfLogIn
-{
-  <#
-    Check if already login to Azure
-    If not the case, ask to login
-    Input:
-      - None
-    Output:
-      - $True
-  #>
-
-  # Check if already log in
-  $context = Get-AzContext
-
-  if (!$context)
-  {
-      Write-Host "Prior, you must connect to Azure Portal"
-      if ($globalLog) { (WriteLog -fileName $logfile -message "WARNING: Not yet connected to Azure") }
-      Connect-AzAccount  
-  }
-  else
-  {
-    Write-Host "Already connected to Azure"
-    if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Already connected to Azure") }
-  }
-}
-
 function CreateFile
 {
   <#
@@ -139,6 +112,61 @@ function WriteLog
   Add-Content -Path $fileName -Value $line
 }
 
+function CheckSaveEvery
+{
+  <#
+    Check if the value of saveEvery in the Json file paramater is at least 10
+    If not the case, write error message and exit
+    Input:
+      - $saveEvery
+    Output:
+      - Exit if error
+  #>
+  param(
+    [Int]$saveEvery
+  )
+
+  if ($saveEvery -lt 10) { 
+    Write-Host "Error: SaveEvery in json parameter file must greater or equal than 10"
+    Write-Host "Error: Current value is $($saveEvery)"
+    Write-Host "Error: Change the value and restart the script"
+    if ($globalLog) { 
+      (WriteLog -fileName $logfile -message "ERROR : Value of saveEvery must be greater or equal than 10" )
+      (WriteLog -fileName $logfile -message "ERROR : Current value is $($saveEvery)" )
+      (WriteLog -fileName $logfile -message "ERROR : Change the value and restart the script" )
+      (WriteLog -fileName $logfile -message "ERROR : script stopped" )
+    }
+    exit 1
+  }
+}
+
+function CheckIfLogIn
+{
+  <#
+    Check if already login to Azure
+    If not the case, ask to login
+    Input:
+      - None
+    Output:
+      - None
+  #>
+
+  # Check if already log in
+  $context = Get-AzContext
+
+  if (!$context)
+  {
+      Write-Host "Prior, you must connect to Azure Portal"
+      if ($globalLog) { (WriteLog -fileName $logfile -message "WARNING: Not yet connected to Azure") }
+      Connect-AzAccount  
+  }
+  else
+  {
+    Write-Host "Already connected to Azure"
+    if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Already connected to Azure") }
+  }
+}
+
 function GetSubscriptions
 {
   <#
@@ -171,8 +199,8 @@ function GetSubscriptions
         (WriteLog -fileName $logfile -message "ERROR : The file defined for subscriptions in Json parameter file was not found." )
         (WriteLog -fileName $logfile -message "ERROR : Current value is $($scope.scope)" )
         (WriteLog -fileName $logfile -message "ERROR : Change the parameter in Json parameter file or load the file with right path and name and restart the script." )
-        exit 1
       }
+      exit 1
     }
     return $listSubscriptions
   }
@@ -192,13 +220,13 @@ function Get-TagOwner
     [String]$tagOwner
   )
   # Retrieve Tags for the subsciption
-  $tags = (Get-AzTag -ResourceID /subscriptions/$subscription)
+  $tags = (Get-AzTag -ResourceID /subscriptions/$($subscription.Id) | Select-Object -ExpandProperty Properties)
   $tagValue = '-'
-  foreach($tagKey in $tags.properties.TagsProperty.keys)
+  foreach($tagKey in $tags.TagsProperty.keys)
   {
-    if($tagKey.ToLower() -eq $tagName.ToLower()){ 
+    if($tagKey.ToLower() -eq $tagOwner.ToLower()){ 
       # $tagKey contains the tag Name
-      $tagValue = $tags.Properties.TagsProperty[$tagKey]
+      $tagValue = $tags.TagsProperty[$tagKey]
     }
   }
   return $tagValue
@@ -231,9 +259,9 @@ function Get-RoleOwnerSubscription
   return $ownerAssignment, $count
 }
 
-<# -----------
-  Main Program
------------ #>
+<# ------------------------------------------------------------------------
+Main Program
+--------------------------------------------------------------------------- #>
 # Create directory results if not exists and filename for results
 if ((CreateDirectoryResult $globalVar.pathResult)) {
   # Create the CSV file result
@@ -247,6 +275,10 @@ if ((CreateDirectoryResult $globalVar.pathResult)) {
 }
 if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Starting processing...") }
 Write-Verbose "Starting processing..."
+
+# Check if saveEvery in Json file parameter is >= 10
+CheckSaveEvery -saveEvery $globalVar.saveEvery
+
 # if variable checkIfLogIn in json file is set to "Y", Check if log in to Azure
 if ($globalVar.checkIfLogIn.ToUpper() -eq "Y") { CheckIfLogIn }
 
@@ -262,11 +294,12 @@ Write-Verbose "$($subscriptions.Count) subscriptions found."
 # if there is at least 1 subscription, Analysis of each subscription
 if ($subscriptions.Count -ne 0) {
   $ownerSubscriptions = @()
+  $countSubscription = 0
   foreach($subscription in $subscriptions)
   {
     if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Analysis of $($subscription.Name) Subscription...") }
     Write-Verbose "Analysis of $($subscription.Name) Subscription..."
-
+    
     # if tag name declared, find matching value
     if ($TagOwner) {
       $tagValue = (Get-TagOwner -subscription $subscription -tagOwner $TagOwner)
@@ -286,7 +319,7 @@ if ($subscriptions.Count -ne 0) {
     Write-Verbose "$($countOwner) Owner(s) found for this subscription."
     Write-Verbose "---------------------" 
     # Create Object for result
-    if($TagName)
+    if($TagOwner)
     {
       $ownerResult=@(
         [PSCustomObject]@{
@@ -307,9 +340,17 @@ if ($subscriptions.Count -ne 0) {
     }
     # Add subscription result in result array
     $ownerSubscriptions += $ownerResult
+    $countSubscription += 1
+    # if number of subscriptions = SaveEvery in json file parameter, write in the result file and re-initiate the array and counter
+    if ($countSubscription -eq $globalVar.saveEvery) {
+      $ownerSubscriptions | Export-Csv -Path $csvResFile -Delimiter ";" -NoTypeInformation -Append
+      $ownerSubscriptions = @()
+      $countSubscription = 0
+    }
   }
-  # Generate the csv file
-  $ownerSubscriptions | Export-Csv -Path $csvResFile -Delimiter ";" -NoTypeInformation
+  # Write last subscriptions
+  if ($countSubscription -gt 0) { $ownerSubscriptions | Export-Csv -Path $csvResFile -Delimiter ";" -NoTypeInformation -Append }
+  
   if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: File $csvResFile is available.") }
   Write-Verbose "File $csvResFile is available."
 }
@@ -324,21 +365,53 @@ else {
 
 <#
   .SYNOPSIS
-  This script retrieves Subscription owner(s) from Access Control (IAM) / Role Assignments and a tag if one is defined.
+  This script retrieves Subscription owner(s) from Access Control (IAM) / Role Assignments and from a tag if it is indicated in command line.
   
   .DESCRIPTION
-  The script searches owner(s) of all subscriptions from IAM and a tag if one is defined and store it 
-  in the file GetAzOwnerSubscriptions[mmddyyyyhhmmss].csv.
+  The script searches owner(s) of subscriptions from IAM and from a tag if one is it is indicated in command line,
+  and store it in the file GetAzOwnerSubscriptions[mmddyyyyhhmmss].csv.
   The format of .csv file is :
-  - if one tag defined : SubscriptionName;TagName;Tag_Value;Owner
-  - if no tag defined : SubscriptionName;Owner
+  - if a tag Owner is defined : SubscriptionName;TagName;Tag_Value;Owner
+  - if no tag Owner defined : SubscriptionName;Owner
   
   Prerequisites :
   - Az module must be installed
   - before running the script, connect to Azure with the cmdlet "Connect-AzAccount"
 
+  Parameters: GetAzOwnerSubscriptions.json file
+  the GetAzOwnerSubscriptions.json file allows to adapt script to context.
+  Parameters are:
+  - pathResult:
+    - Directory where to store results.
+    - Format : "C:/Path/subPath/.../"
+  
+    - fileResult: name of result file and log file (by default, GetAzOwnerSubscriptions)
+  
+    - chronoFile: Y|N.
+    - Set to "Y" if you want a chrono in the name of the file.
+    - Format: mmddyyyyhhmmss
+  
+    - generateLogFile: Y|N. Set to "Y" if you want a log file
+  
+  - checkIfLogIn: Y|N. Set to "Y" if you want to check if log in to Azure is done
+
+  - subscriptions: 
+    - scope: All|.csv file
+      - if you set "All", process all subscription
+      - if you set a .csv file, process subscriptions in file
+        + format must be: 
+          - 1st column : Subscription Name with column named "Name"
+          - 2nd column : Subscription Id with column name "Id"
+        + example: "scope": "C:/data/subscriptions.csv"
+        + example: "scope": "C:/data/subscriptions.csv"
+    - delimiter: indicate the delimiter in the .csv file
+
+  - saveEvery: Indicates how many resources should be written at the same time to the result file
+    - by default value is 50 and minimum tolerated value is 10
+    - If you have less memory available, reduce the value.
+
   .INPUTS
-  Optional : -TagName <Tag_Name>. If one tag contains the owner, indicate this tag name.
+  Optional : -TagOwner <Tag_Name>. If one tag contains the owner, indicates it.
   Optional : -Verbose to have progress informations on console
 
   .OUTPUTS
@@ -346,7 +419,7 @@ else {
 
   .EXAMPLE
   .\Get-AzOwnerSubscriptions.ps1 : Retrieve Owner(s) in IAM.
-  .\Get-AzOwnerSubscriptions.ps1 -TagName 'tag name' : Retrieve Owner(s) in both IAM and Tag Name specified.
+  .\Get-AzOwnerSubscriptions.ps1 -TagOwner 'tag Name' : Retrieve Owner(s) in both IAM and Tag Name specified.
   .\Get-AzOwnerSubscriptions.ps1 -Verbose : Execute the script without output progress informations on console.
 
   .NOTES

@@ -78,33 +78,6 @@ function CreateDirectoryResult{
   return $True
 }
 
-function CheckIfLogIn
-{
-  <#
-    Check if already login to Azure
-    If not the case, ask to login
-    Input:
-      - None
-    Output:
-      - $True
-  #>
-
-  # Check if already log in
-  $context = Get-AzContext
-
-  if (!$context)
-  {
-      Write-Host "Prior, you must connect to Azure Portal"
-      if ($globalLog) { (WriteLog -fileName $logfile -message "WARNING: Not yet connected to Azure") }
-      Connect-AzAccount  
-  }
-  else
-  {
-    Write-Host "Already connected to Azure"
-    if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Already connected to Azure") }
-  }
-}
-
 function CreateFile
 {
   <#
@@ -157,6 +130,33 @@ function WriteLog
   $chrono = (Get-Date -Format "MM/dd/yyyy hh:mm:ss")
   $line = $chrono + ": " + $message
   Add-Content -Path $fileName -Value $line
+}
+
+function CheckIfLogIn
+{
+  <#
+    Check if already login to Azure
+    If not the case, ask to login
+    Input:
+      - None
+    Output:
+      - None
+  #>
+
+  # Check if already log in
+  $context = Get-AzContext
+
+  if (!$context)
+  {
+      Write-Host "Prior, you must connect to Azure Portal"
+      if ($globalLog) { (WriteLog -fileName $logfile -message "WARNING: Not yet connected to Azure") }
+      Connect-AzAccount  
+  }
+  else
+  {
+    Write-Host "Already connected to Azure"
+    if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Already connected to Azure") }
+  }
 }
 
 function ReplaceEmpty
@@ -261,8 +261,8 @@ function GetSubscriptions
         (WriteLog -fileName $logfile -message "ERROR : The file defined for subscriptions in Json parameter file was not found." )
         (WriteLog -fileName $logfile -message "ERROR : Current value is $($scope.scope)" )
         (WriteLog -fileName $logfile -message "ERROR : Change the parameter in Json parameter file or load the file with right path and name and restart the script." )
-        exit 1
       }
+      exit 1
     }
     return $listSubscriptions
   }
@@ -324,11 +324,12 @@ function GetVmInfo
         $_.tags.$($globalVar.tags.environment), $_.tags.$($globalVar.tags.availability)
       }
     )
+    <#
     if ($resInfos.count -ne 0) {
-      # If Tags are empty, replaced by "-"
-      # $resInfos[3] = (ReplaceEmpty -checkStr $resInfos[3] -replacedBy "-")
-      # $resInfos[4] = (ReplaceEmpty -checkStr $resInfos[4] -replacedBy "-")
-    }
+      If Tags are empty, replaced by "-"
+      $resInfos[3] = (ReplaceEmpty -checkStr $resInfos[3] -replacedBy "-")
+      $resInfos[4] = (ReplaceEmpty -checkStr $resInfos[4] -replacedBy "-")
+    } #>
   }
   catch {
     Write-Host "An error occured retrieving VM informations for $vmName"
@@ -561,7 +562,10 @@ if ($globalLog) {
     - scope: All|.csv file
       - if you set "All", process all subscription
       - if you set a .csv file, process subscriptions in file
-        + format must be: subscription Name,Subscription ID
+        + format must be: 
+          - 1st column : Subscription Name with column named "Name"
+          - 2nd column : Subscription Id with column name "Id"
+        + example: "scope": "C:/data/subscriptions.csv"
         + example: "scope": "C:/data/subscriptions.csv"
     - delimiter: indicate the delimiter in the .csv file
   

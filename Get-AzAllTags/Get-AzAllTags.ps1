@@ -38,32 +38,6 @@ $globalLog = $false # set to $true if generateLogFile in json file is set to "Y"
 <# -----------
   Declare Functions
 ----------- #>
-function CheckIfLogIn
-{
-  <#
-    Check if already login to Azure
-    If not the case, ask to login
-    Input:
-      - None
-    Output:
-      - $True
-  #>
-
-  # Check if already log in
-  $context = Get-AzContext
-
-  if (!$context)
-  {
-      Write-Host "Prior, you must connect to Azure Portal"
-      if ($globalLog) { (WriteLog -fileName $logfile -message "WARNING: Not yet connected to Azure") }
-      Connect-AzAccount  
-  }
-  else
-  {
-    Write-Host "Already connected to Azure"
-    if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Already connected to Azure") }
-  }
-}
 function CreateDirectoryResult
 {
   <#
@@ -134,6 +108,61 @@ function WriteLog
   $chrono = (Get-Date -Format "MM/dd/yyyy hh:mm:ss")
   $line = $chrono + ": " + $message
   Add-Content -Path $fileName -Value $line
+}
+
+function CheckSaveEvery
+{
+  <#
+    Check if the value of saveEvery in the Json file paramater is at least 10
+    If not the case, write error message and exit
+    Input:
+      - $saveEvery
+    Output:
+      - Exit if error
+  #>
+  param(
+    [Int]$saveEvery
+  )
+
+  if ($saveEvery -lt 10) { 
+    Write-Host "Error: SaveEvery in json parameter file must greater or equal than 10"
+    Write-Host "Error: Current value is $($saveEvery)"
+    Write-Host "Error: Change the value and restart the script"
+    if ($globalLog) { 
+      (WriteLog -fileName $logfile -message "ERROR : Value of saveEvery must be greater or equal than 10" )
+      (WriteLog -fileName $logfile -message "ERROR : Current value is $($saveEvery)" )
+      (WriteLog -fileName $logfile -message "ERROR : Change the value and restart the script" )
+      (WriteLog -fileName $logfile -message "ERROR : script stopped" )
+    }
+    exit 1
+  }
+}
+
+function CheckIfLogIn
+{
+  <#
+    Check if already login to Azure
+    If not the case, ask to login
+    Input:
+      - None
+    Output:
+      - None
+  #>
+
+  # Check if already log in
+  $context = Get-AzContext
+
+  if (!$context)
+  {
+      Write-Host "Prior, you must connect to Azure Portal"
+      if ($globalLog) { (WriteLog -fileName $logfile -message "WARNING: Not yet connected to Azure") }
+      Connect-AzAccount  
+  }
+  else
+  {
+    Write-Host "Already connected to Azure"
+    if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Already connected to Azure") }
+  }
 }
 
 function GetTags
@@ -218,8 +247,8 @@ function GetSubscriptions
         (WriteLog -fileName $logfile -message "ERROR : The file defined for subscriptions in Json parameter file was not found." )
         (WriteLog -fileName $logfile -message "ERROR : Current value is $($scope.scope)" )
         (WriteLog -fileName $logfile -message "ERROR : Change the parameter in Json parameter file or load the file with right path and name and restart the script." )
-        exit 1
       }
+      exit 1
     }
     return $listSubscriptions
   }
@@ -326,21 +355,13 @@ if ( (CreateDirectoryResult $globalVar.pathResult) ) {
 }
 if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Starting processing...") }
 Write-Verbose "Starting processing..."
+
+# Check if saveEvery in Json file parameter is >= 10
+CheckSaveEvery -saveEvery $globalVar.saveEvery
+
 # if variable checkIfLogIn in json file is set to "Y", Check if log in to Azure
 if ($globalVar.checkIfLogIn.ToUpper() -eq "Y") { CheckIfLogIn }
-# Check if variable saveEvery in json file parameter is greater or equal than 10, else stop script
-if ($globalVar.saveEvery -lt 10) {
-  Write-Host "Error: SaveEvery in json parameter file must greater or equal than 10"
-  Write-Host "Error: Current value is $($globalVar.saveEvery)"
-  Write-Host "Error: Change the value and restart the script"
-  if ($globalLog) { 
-    (WriteLog -fileName $logfile -message "ERROR : Value of saveEvery must be greater or equal than 10" )
-    (WriteLog -fileName $logfile -message "ERROR : Current value is $($globalVar.saveEvery)" )
-    (WriteLog -fileName $logfile -message "ERROR : Change the value and restart the script" )
-    (WriteLog -fileName $logfile -message "ERROR : script stopped" )
-  }
-  exit 1
-}
+
 # retrieve Subscriptions
 # $subscriptions = Get-AzSubscription | Where-Object {($_.Name -clike "*DXC*") -and ($_.State -eq "Enabled")}
 $subscriptions = (GetSubscriptions -scope $globalVar.subscriptionsScope)
@@ -467,7 +488,9 @@ if ($globalLog) {
     - scope: All|.csv file
       - if you set "All", process all subscription
       - if you set a .csv file, process subscriptions in file
-        + format must be: subscription Name,Subscription ID
+        + format must be: 
+          - 1st column : Subscription Name with column named "Name"
+          - 2nd column : Subscription Id with column name "Id"
         + example: "scope": "C:/data/subscriptions.csv"
     - delimiter: indicate the delimiter in the .csv file
 

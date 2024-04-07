@@ -1,5 +1,7 @@
 <# --------------------------
 Functions for Azure:
+- CheckSaveEvery: Checks if the value of saveEvery in the Json file paramater is at least 10
+
 - CheckIfLogin: Checks if already login to Azure and if not the case, ask to log in
 
 - GetSubscriptions : Retrieves subcriptions from a scope: All or a .csv file with subcription name and Id to process
@@ -17,6 +19,34 @@ Functions for Azure:
 - Get-RoleOwnerSubscription: Retrieves the owner(s) declared in IAM for a subscription
 -----------------------------#>
 
+function CheckSaveEvery
+{
+  <#
+    Check if the value of saveEvery in the Json file paramater is at least 10
+    If not the case, write error message and exit
+    Input:
+      - $saveEvery
+    Output:
+      - Exit if error
+  #>
+  param(
+    [Int]$saveEvery
+  )
+
+  if ($saveEvery -lt 10) { 
+    Write-Host "Error: SaveEvery in json parameter file must greater or equal than 10"
+    Write-Host "Error: Current value is $($saveEvery)"
+    Write-Host "Error: Change the value and restart the script"
+    if ($globalLog) { 
+      (WriteLog -fileName $logfile -message "ERROR : Value of saveEvery must be greater or equal than 10" )
+      (WriteLog -fileName $logfile -message "ERROR : Current value is $($saveEvery)" )
+      (WriteLog -fileName $logfile -message "ERROR : Change the value and restart the script" )
+      (WriteLog -fileName $logfile -message "ERROR : script stopped" )
+    }
+    exit 1
+  }
+}
+# -----------------------------------------------------
 function CheckIfLogIn
 {
   <#
@@ -25,7 +55,7 @@ function CheckIfLogIn
     Input:
       - None
     Output:
-      - $True
+      - None
   #>
 
   # Check if already log in
@@ -76,8 +106,8 @@ function GetSubscriptions
         (WriteLog -fileName $logfile -message "ERROR : The file defined for subscriptions in Json parameter file was not found." )
         (WriteLog -fileName $logfile -message "ERROR : Current value is $($scope.scope)" )
         (WriteLog -fileName $logfile -message "ERROR : Change the parameter in Json parameter file or load the file with right path and name and restart the script." )
-        exit 1
       }
+      exit 1
     }
     return $listSubscriptions
   }

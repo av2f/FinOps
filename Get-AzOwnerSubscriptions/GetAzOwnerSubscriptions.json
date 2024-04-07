@@ -8,5 +8,5 @@
     "scope": "C:/Users/fparment/Documents/AzFinOps/Data/Alstom/subscriptions.csv",
     "delimiter": ";"
   },
-  "saveEvery": 100
+  "saveEvery": 50
 }
