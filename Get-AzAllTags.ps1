@@ -456,11 +456,13 @@ if ($globalLog) {
   
   - checkIfLogIn: Y|N. Set to "Y" if you want to check if log in to Azure is done
 
-  - subscriptions: All|.csv file.
-    - if you set "Y", process all subscription
-    - if you set a .csv file, process subscriptions in file
-      - format must be: subscription Name,Subscription ID
-      - example if you set a file: "C:/data/subscriptions.csv"
+  - subscriptions: 
+    - scope: All|.csv file
+      - if you set "All", process all subscription
+      - if you set a .csv file, process subscriptions in file
+        + format must be: subscription Name,Subscription ID
+        + example: "scope": "C:/data/subscriptions.csv"
+    - delimiter: indicate the delimiter in the .csv file
 
   - saveEvery: Indicates how many resources should be written at the same time to the result file
     - by default value is 100 and minimum tolerated value is 10
