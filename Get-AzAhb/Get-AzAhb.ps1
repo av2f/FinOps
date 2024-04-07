@@ -8,8 +8,31 @@
   Updated by    :
   Update done   :
 
-  Optimize OS Azure Hybrid Management
-  ..\Data\GetAzAhb\GetAzAhb[mmddyyyyhhmmss].csv
+  Help to optimize Azure Hybrid Benefit (AHB) management
+
+  Build a .csv file that contains for each Windows VMs:
+  - Subscription Name
+  - Subscription Id
+  - Resource Group Name
+  - VM Name
+  - Location
+  - PowerState
+  - OS Type
+  - OS Name (when specified in Azure)
+  - License Type: 
+    - if "Windows_Server" then AHB is applied
+    - if "Windows_Client" then Azure Virtual Desktop is applied
+  - Size of VM
+  - Number of Cores of VMs
+  - RAM of VMs
+  - Tag Environment (if exists and specified in the Json file parameter)
+  - Tag Availability (if exists and specified in the Json file parameter)
+  - Calculate if AHB applied
+    - Number of AHB cores consumed
+    - Number of AHB licenses consumed
+    - Number of AHB cores wasted (based on Number of cores by licenses specified in the Json file parameter)
+  in result file GetAzAhb[mmddyyyyhhmmss].csv
+  
   For more information, type Get-Help .\Get-AzAhb.ps1 [-detailed | -full]
 
   Global variables are stored in .\GetAzAhb.json and must be adapted accordingly
@@ -473,9 +496,13 @@ if ($subscriptions.Count -ne 0) {
     }
     Write-Verbose "---------------------------------------------"
   }
+  if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: File $csvResFile is available.") }
+  Write-Verbose "File $csvResFile is available."
 }
-if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: File $csvResFile is available.") }
-Write-Verbose "File $csvResFile is available."
+else {
+  if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: No Subscriptions enabled found.") }
+  Write-Verbose "No Subscriptions enabled found."
+}
 if ($globalLog) {
   (WriteLog -fileName $logfile -message "INFO: End processing with $globalError error(s)...") 
 }

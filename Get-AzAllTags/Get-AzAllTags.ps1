@@ -408,9 +408,16 @@ if ($subscriptions.Count -ne 0) {
     }
     Write-Verbose "---------------------------------------------"
   }
+  if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: File $csvResFile is available.") }
+  Write-Verbose "File $csvResFile is available."
+  if ($globalLog) {
+    (WriteLog -fileName $logfile -message "INFO: End processing with $globalError error(s)...") 
+  }
 }
-if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: File $csvResFile is available.") }
-Write-Verbose "File $csvResFile is available."
+else {
+  if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: No Subscriptions enabled found.") }
+  Write-Verbose "No Subscriptions enabled found."
+}
 if ($globalLog) {
   (WriteLog -fileName $logfile -message "INFO: End processing with $globalError error(s)...") 
 }

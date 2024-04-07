@@ -1,0 +1,12 @@
+{
+  "pathResult": "C:/Users/fparment/Documents/AzFinOps/Data/GetAzOwnerSubscriptions/",
+  "fileResult": "GetAzOwnerSubscriptions",
+  "chronoFile": "Y",
+  "generateLogFile": "Y",
+  "checkIfLogIn": "Y",
+  "subscriptionsScope": {
+    "scope": "C:/Users/fparment/Documents/AzFinOps/Data/Alstom/subscriptions.csv",
+    "delimiter": ";"
+  },
+  "saveEvery": 100
+}
