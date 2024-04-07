@@ -1,3 +1,7 @@
+<# --------------------------
+Functions for string management:
+- ReplaceEmpty: Replaces an empty string by string given in parameter
+-----------------------------#>
 function ReplaceEmpty
 {
   <#

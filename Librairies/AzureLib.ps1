@@ -1,3 +1,22 @@
+<# --------------------------
+Functions for Azure:
+- CheckIfLogin: Checks if already login to Azure and if not the case, ask to log in
+
+- GetSubscriptions : Retrieves subcriptions from a scope: All or a .csv file with subcription name and Id to process
+
+- GetVmsFromRg: Retrieves for VMs from Resource group $rgName retrieving following VMs informations:
+  - Name, Location, OsName, PowerState
+  - filter by OsType = Windows
+
+- GetVmInfo: Retrieves for VM:
+  - OsType, LicenseType, SKU, Environment and Availibity,
+  - filter by OsType = Windows
+
+- GetVmSizing: Retrieves for VM the Number of Cores and RAM in MB
+
+- Get-RoleOwnerSubscription: Retrieves the owner(s) declared in IAM for a subscription
+-----------------------------#>
+
 function CheckIfLogIn
 {
   <#
@@ -165,4 +184,31 @@ function GetVmSizing
     $globalError += 1
   }
   return $resSizing
+}
+# ----------------------------------------------------------
+function Get-RoleOwnerSubscription
+{
+  <#
+    Retrieve the owner(s) declared in IAM for a subscription
+    Input :
+      - subscription : subscrption name for which the owner(s) must be sought
+    Output : 
+      - $ownerAssignment : String which contains owner(s) with format : Owner1_name[Type]-Owner2_name[Type]-...
+      - $count : Number of Owner found
+  #>
+  param(
+    [Object[]]$subscription
+  )
+  $ownerAssignment = ""
+  $roleAssignments = (Get-AzRoleAssignment -Scope /subscriptions/$($subscription.Id) | Where-Object {$_.RoleDefinitionName -eq "Owner"} | Select-Object -Property DisplayName, ObjectType)
+  $count = $roleAssignments.count
+  if($count -ne 0)
+  {
+    foreach($roleAssignment in $roleAssignments)
+    {
+      $owner = $roleAssignment.DisplayName + '[' + $roleAssignment.ObjectType +']-'
+      $ownerAssignment += $owner
+    }
+  }
+  return $ownerAssignment, $count
 }

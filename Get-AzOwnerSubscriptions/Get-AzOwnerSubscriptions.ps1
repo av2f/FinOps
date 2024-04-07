@@ -88,15 +88,15 @@ function CheckIfLogIn
 function CreateFile
 {
   <#
-    Create file with chrono with format : <filename>.MMddyyyyHHmmss
+    Create file with chrono with format : <filename>MMddyyyyHHmmss
     Input:
       - $pathName: Path where create file
       - $fileName: File name
       - $extension: Extension of file to create
-      - $chrono: Y|N - Specify if the file must be created with format $fileName.MMddyyyyHHmmss
+      - $chrono: Y|N - Specify if the file must be created with format $fileNameMMddyyyyHHmmss
     Output: 
       - $resFileName = File name accordingly options
-    Use the variable $globalChronoFile to set up the chrono
+    Use the variable $globalChronoFile in Json file parameter to set up the chrono
   #>
   param(
     [String]$pathName,
@@ -224,7 +224,7 @@ function Get-RoleOwnerSubscription
   {
     foreach($roleAssignment in $roleAssignments)
     {
-      $owner = $roleAssignment.DisplayName + '[' + $roleAssignment.ObjectType +']-'
+      $owner = $roleAssignment.DisplayName + '{' + $roleAssignment.ObjectType +'},'
       $ownerAssignment += $owner
     }
   }
