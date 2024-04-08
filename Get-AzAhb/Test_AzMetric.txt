@@ -1,0 +1,7 @@
+Test Get-AzMetric
+
+Subscription: EA DXC Cloud Ops managed services for Alstom Non-Prod
+Subscription Id: 80f0f1bc-6d6f-4d58-a6ea-6a1aefb4bb21
+Resource Group: sdc3-01252-qual-rg
+VM Name: srsdc301252w401
+

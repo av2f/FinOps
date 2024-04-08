@@ -31,6 +31,7 @@
     - Number of AHB cores consumed
     - Number of AHB licenses consumed
     - Number of AHB cores wasted (based on Number of cores by licenses specified in the Json file parameter)
+    - Number of AHB cores wasted when VM is in powerstate "Deallocated"
   in result file GetAzAhb[mmddyyyyhhmmss].csv
   
   For more information, type Get-Help .\Get-AzAhb.ps1 [-detailed | -full]
@@ -192,16 +193,19 @@ function CalcCores
       - $calcCores: array of results
   #>
   param(
-    [Int16]$nbCores,
-    [Int16]$coresByLicense,
-    [String]$licenseType
+    [Int]$nbCores,
+    [Int]$coresByLicense,
+    [String]$licenseType,
+    [String]$powerState
   )
 
   $calcCores = @{
     coresConsumed = 0
     licensesConsumed = 0
     coresWasted = 0
+    coresDeallocatedWasted = 0
   }
+  $stateDeallocated = "deallocated"
   $floor = [Math]::Floor($nbCores/$coresByLicense)
   $modulus = $nbCores % $coresByLicense
   # if License applied is Hybrid Benefit
@@ -224,6 +228,9 @@ function CalcCores
           $calcCores['coresWasted'] = ($coresByLicense * ($floor + 1)) - $nbCores
         }
       }
+    }
+    if ($powerState.ToLower().contains($stateDeallocated)) {
+      $calcCores['coresDeallocatedWasted'] = $calcCores['coresConsumed']
     }
   }
   return $calcCores
@@ -381,8 +388,8 @@ function SetObjResult {
   param(
     [array]$listResult
   )
-  if ($listResult.Count -ne 17) {
-    $listResult = @('-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-','-','-')
+  if ($listResult.Count -ne 18) {
+    $listResult = @('-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-','-','-','-')
   }
   $objTagResult = @(
     [PSCustomObject]@{
@@ -403,6 +410,7 @@ function SetObjResult {
       Nb_AHB_Cores_Consumed = $listResult[14]
       Nb_AHB_Licenses_Consumed = $listResult[15]
       Nb_AHB_Cores_Wasted = $listResult[16]
+      NB_AHB_Cores_Deallocated_Wasted = $listResult[17]
     }
   )
   return $objTagResult
@@ -476,14 +484,15 @@ if ($subscriptions.Count -ne 0) {
               # -- Retrieve VM sizing
               $vmSizing = GetVmSizing -rgName $resourceGroupName.ResourceGroupName -vmName $vm.Name -sku $vmInfos[2]
               # -- Calculate Cores and Licenses for Hybrid Benefits
-              $resultCores = CalcCores -nbCores $vmSizing.NumberOfCores -coresByLicense $globalVar.weightLicenseInCores -licenseType $vmInfos[1]
+              $resultCores = CalcCores -nbCores $vmSizing.NumberOfCores -coresByLicense $globalVar.weightLicenseInCores -licenseType $vmInfos[1] -powerState $vm.PowerState
               # Aggregate informations
               $objVmResult += SetObjResult @(
                 $subscription.Name, $subscription.Id, $resourceGroupName.ResourceGroupName,
                 $vm.Name, $vm.Location, $vm.PowerState,
                 $vmInfos[0], $vm.OsName, $vmInfos[1],
                 $vmInfos[2], $vmSizing.NumberOfCores, $vmSizing.MemoryInMB,
-                $vmInfos[3],$vmInfos[4],$resultCores['CoresConsumed'], $resultCores['licensesConsumed'], $resultCores['coresWasted']
+                $vmInfos[3],$vmInfos[4],$resultCores['CoresConsumed'],
+                $resultCores['licensesConsumed'], $resultCores['coresWasted'], $resultCores['coresDeallocatedWasted']
               )
             }
           }
@@ -532,10 +541,11 @@ if ($globalLog) {
   - Tag Environment if existing
   - Tag Availability if existing
 
-  In addition, there are 3 calculated columns for VMs for which AHB is applied:
+  In addition, there are 4 calculated columns for VMs for which AHB is applied:
   - Number of AHB cores consumed
   - Number of AHB licenses consumed
   - Number of AHB cores wasted
+  - Number of AHB cores wasted when VM is in powerstate "Deallocated"
      
   Prerequisites:
   - Az module must be installed
