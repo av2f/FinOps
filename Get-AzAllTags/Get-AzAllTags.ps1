@@ -250,8 +250,8 @@ function GetSubscriptions
       }
       exit 1
     }
-    return $listSubscriptions
   }
+  return $listSubscriptions
 }
 
 function GetSubscriptionTags
