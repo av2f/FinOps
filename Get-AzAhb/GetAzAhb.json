@@ -1,0 +1,30 @@
+{
+  "pathResult": "C:/Users/fparment/Documents/AzFinOps/Data/GetAzAhb/",
+  "fileResult": "GetAzAhb",
+  "chronoFile": "N",
+  "generateLogFile": "Y",
+  "checkIfLogIn": "Y",
+  "subscriptionsScope": {
+    "scope": "All",
+    "delimiter": ";"
+  },
+  "osTypeFilter": "Windows",
+  "hybridBenefit": {
+    "licenseType": "Windows_Server",
+    "name": "Hybrid Benefit"
+  },
+  "virtualDesktop": {
+    "licenseType": "Windows_Client",
+    "name": "Azure Virtual Desktop"
+  },
+  "weightLicenseInCores": 8,
+  "metrics": {
+    "cpuUsage": "Percentage CPU",
+    "memoryAvailable": "Available Memory Bytes",
+    "retentionDays": 30
+  },
+  "tags": {
+    "environment": "Environment",
+    "availability": "ServiceWindows"
+  }
+}

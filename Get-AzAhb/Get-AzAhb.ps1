@@ -27,6 +27,9 @@
   - RAM of VMs
   - Tag Environment (if exists and specified in the Json file parameter)
   - Tag Availability (if exists and specified in the Json file parameter)
+  - Calculate for each VMs:
+    - Average CPU usage in percentage during the retention days indicated in the Json parameter file
+    - Average Memory usage in percentage during the retention days indicated in the Json parameter file
   - Calculate if AHB applied
     - Number of AHB cores consumed
     - Number of AHB licenses consumed
@@ -327,21 +330,21 @@ function GetVmInfo
     $resInfos = (Get-AzVM -ResourceGroupName $rgName -Name $vmName |
       Where-Object { $_.StorageProfile.OSDisk.OsType -eq $($globalVar.osTypeFilter) } |
       ForEach-Object {
-        $_.StorageProfile.OSDisk.OsType, $_.LicenseType, $_.HardwareProfile.VmSize,
+        $_.Id, $_.StorageProfile.OSDisk.OsType, $_.LicenseType, $_.HardwareProfile.VmSize,
         $_.tags.$($globalVar.tags.environment), $_.tags.$($globalVar.tags.availability)
       }
     )
     <#
     if ($resInfos.count -ne 0) {
       If Tags are empty, replaced by "-"
-      $resInfos[3] = (ReplaceEmpty -checkStr $resInfos[3] -replacedBy "-")
-      $resInfos[4] = (ReplaceEmpty -checkStr $resInfos[4] -replacedBy "-")
+      $resInfos[4] = (ReplaceEmpty -checkStr $resInfos[3] -replacedBy "-")
+      $resInfos[5] = (ReplaceEmpty -checkStr $resInfos[4] -replacedBy "-")
     } #>
   }
   catch {
     Write-Host "An error occured retrieving VM informations for $vmName"
     if ($globalLog) { (WriteLog -fileName $logfile -message "ERROR: An error occured retrieving VM informations for $vmName") }
-    $resInfos = @('Error', 'Error', 'Error', 'Error', 'Error')
+    $resInfos = @('Error','Error', 'Error', 'Error', 'Error', 'Error')
     $globalError += 1
   }
   return $resInfos
@@ -379,6 +382,98 @@ function GetVmSizing
   return $resSizing
 }
 
+function GetAvgCpuUsage
+{
+  <#
+    Calculate the Average CPU Usage in percentage for
+    a resource Id and for a retention in days
+    Input:
+      - $resourceId: Resource Id to calculate CPU usage
+      - $metric: Metric to use to calculate
+      - $retentionDays: Number of days to calculate the average. Limit max = 30 days
+    Output:
+      - $resAvgCpuUsage: Average in percentage of CPU usage during the last $retentionDays
+  #>
+  param(
+    [String]$resourceId,
+    [String]$metric,
+    [Int16]$retentionDays
+  )
+  # Define Start and End dates
+  $startTime = (Get-Date).AddDays(-$retentionDays)
+  $endTime = (Get-Date)
+
+  # if $retentionDays > 30 days, set up to 7 days
+  if ($retentionDays -gt 30) {
+    $retentionDays = 7
+  }
+  
+  $resAvgCpuUsage = 0
+  # Retrieve Average CPU usage in percentage
+  $avgCpus = (Get-AzMetric -ResourceId $resourceId -MetricName $metric -StartTime $startTime -EndTime $endTime -AggregationType Average -TimeGrain 1.00:00:00 |
+    ForEach-Object { $_.Data.Average })
+  
+    # Calculate Average of CPU usage in percentage
+  foreach ($avgCpu in $avgCpus) {
+    $resAvgCpuUsage += $avgCpu
+  }
+  return [Math]::Round($resAvgCpuUsage/$avgCpus.count,2)
+}
+
+function GetAvgMemUsage
+{
+  <#
+    Calculate the Average Memory (RAM) Usage in percentage for
+    a resource Id and for a retention in days
+    Input:
+      - $resourceId: Resource Id to calculate RAM usage
+      - $metric: Metric to use to calculate
+      - $retentionDays: Number of days to calculate the average. Limit max = 30 days
+      - $vmMemory: RAM in MB of the VM the resource Id
+
+    Output:
+      - $resAvgMemUsage: Average in MB of RAM usage during the last $retentionDays
+  #>
+  param(
+    [String]$resourceId,
+    [String]$metric,
+    [Int16]$retentionDays,
+    [Int]$vmMemory
+  )
+  # Define Start and End dates
+
+  # Process if $vmMemory greater than 0
+  If ($vmMemory -gt 0) {
+    $resAvgMemUsage = 0
+    
+    $startTime = (Get-Date).AddDays(-$retentionDays)
+    $endTime = (Get-Date)
+
+    # if $retentionDays > 30 days, set up to 7 days
+    if ($retentionDays -gt 30) {
+      $retentionDays = 7
+    }
+
+    # Retrieve Average of available RAM in Bytes
+    $avgAvailableMems = (Get-AzMetric -ResourceId $resourceId -MetricName $metric -StartTime $startTime -EndTime $endTime -AggregationType Average -TimeGrain 1.00:00:00 |
+      ForEach-Object { $_.Data.Average })
+    
+      # Calculate Average of Memory usage in percentage
+    foreach ($avgAvailableMem in $avgAvailableMems) {
+      # if value is null, $avgAvailableMem = $vmMemory in Bytes
+      if ($null -eq $avgAvailableMem) {
+        $avgAvailableMem = $vmMemory * 1024 * 1024
+      }
+      $resAvgMemUsage += (($vmMemory - ($avgAvailableMem/(1024*1024))) * 100) / $vmMemory
+      $resAvgMemUsage = [Math]::Round($resAvgMemUsage/$avgAvailableMems.count,2)
+    }
+  }
+  # else $resAvgMemUsage = 0
+  else { $resAvgMemUsage = 0 }
+  
+  return $resAvgMemUsage
+}
+
 function SetObjResult {
   <#
     Create Object array with informations contained in the array $listResult
@@ -388,8 +483,8 @@ function SetObjResult {
   param(
     [array]$listResult
   )
-  if ($listResult.Count -ne 18) {
-    $listResult = @('-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-','-','-','-')
+  if ($listResult.Count -ne 20) {
+    $listResult = @('-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-','-','-','-','-','-')
   }
   $objTagResult = @(
     [PSCustomObject]@{
@@ -405,12 +500,14 @@ function SetObjResult {
       Size = $listResult[9]
       Nb_Cores = $listResult[10]
       Ram = $listResult[11]
-      tag_Environment = $listResult[12]
-      tag_Availability = $listResult[13]
-      Nb_AHB_Cores_Consumed = $listResult[14]
-      Nb_AHB_Licenses_Consumed = $listResult[15]
-      Nb_AHB_Cores_Wasted = $listResult[16]
-      NB_AHB_Cores_Deallocated_Wasted = $listResult[17]
+      Tag_Environment = $listResult[12]
+      Tag_Availability = $listResult[13]
+      Avg_CPU_Usage_Percent = $listResult[14]
+      Avg_Mem_Usage_Percent = $listResult[15]
+      Nb_AHB_Cores_Consumed = $listResult[16]
+      Nb_AHB_Licenses_Consumed = $listResult[17]
+      Nb_AHB_Cores_Wasted = $listResult[18]
+      NB_AHB_Cores_Deallocated_Wasted = $listResult[19]
     }
   )
   return $objTagResult
@@ -482,16 +579,20 @@ if ($subscriptions.Count -ne 0) {
             if ($vmInfos.Count -ne 0) {
               $windowsVm += 1
               # -- Retrieve VM sizing
-              $vmSizing = GetVmSizing -rgName $resourceGroupName.ResourceGroupName -vmName $vm.Name -sku $vmInfos[2]
+              $vmSizing = GetVmSizing -rgName $resourceGroupName.ResourceGroupName -vmName $vm.Name -sku $vmInfos[3]
               # -- Calculate Cores and Licenses for Hybrid Benefits
-              $resultCores = CalcCores -nbCores $vmSizing.NumberOfCores -coresByLicense $globalVar.weightLicenseInCores -licenseType $vmInfos[1] -powerState $vm.PowerState
+              $resultCores = CalcCores -nbCores $vmSizing.NumberOfCores -coresByLicense $globalVar.weightLicenseInCores -licenseType $vmInfos[2] -powerState $vm.PowerState
+              # -- Calculate CPU usage in percentage
+              $avgPercentCpu = (GetAvgCpuUsage -resourceId $vmInfos[0] -metric $globalVar.metrics.cpuUsage -retentionDays $globalVar.metrics.retentionDays)
+              # -- Calculate Memory usage in percentage
+              $avgPercentMem = (GetAvgMemUsage -ResourceId $vmInfos[0] -metric $globalVar.metrics.memoryAvailable -retentionDays $globalVar.metrics.retentionDays -vmMemory $vmSizing.MemoryInMB)
               # Aggregate informations
               $objVmResult += SetObjResult @(
                 $subscription.Name, $subscription.Id, $resourceGroupName.ResourceGroupName,
                 $vm.Name, $vm.Location, $vm.PowerState,
-                $vmInfos[0], $vm.OsName, $vmInfos[1],
-                $vmInfos[2], $vmSizing.NumberOfCores, $vmSizing.MemoryInMB,
-                $vmInfos[3],$vmInfos[4],$resultCores['CoresConsumed'],
+                $vmInfos[1], $vm.OsName, $vmInfos[2],
+                $vmInfos[3], $vmSizing.NumberOfCores, $vmSizing.MemoryInMB,
+                $vmInfos[4],$vmInfos[5],$avgPercentCpu, $avgPercentMem, $resultCores['CoresConsumed'],
                 $resultCores['licensesConsumed'], $resultCores['coresWasted'], $resultCores['coresDeallocatedWasted']
               )
             }
@@ -541,12 +642,16 @@ if ($globalLog) {
   - Tag Environment if existing
   - Tag Availability if existing
 
-  In addition, there are 4 calculated columns for VMs for which AHB is applied:
-  - Number of AHB cores consumed
-  - Number of AHB licenses consumed
-  - Number of AHB cores wasted
-  - Number of AHB cores wasted when VM is in powerstate "Deallocated"
-     
+  In addition, there are:
+    - 2 calcultated columns for each VMs
+      +Average CPU usage in percentage during the retention days indicated in the Json parameter file
+      + Average Memory usage in percentage during the retention days indicated in the Json parameter file
+    - 4 calculated columns for VMs for which AHB is applied:
+      + Number of AHB cores consumed
+      + Number of AHB licenses consumed
+      + Number of AHB cores wasted
+      + Number of AHB cores wasted when VM is in powerstate "Deallocated"
+        
   Prerequisites:
   - Az module must be installed
   - before running the script, connect to Azure with the cmdlet "Connect-AzAccount"
@@ -558,13 +663,13 @@ if ($globalLog) {
     - Directory where to store results.
     - Format : "C:/Path/subPath/.../"
   
-    - fileResult: name of result file and log file (by default, GetAzAhb)
+  - fileResult: name of result file and log file (by default, GetAzAhb)
   
-    - chronoFile: Y|N.
+  - chronoFile: Y|N.
     - Set to "Y" if you want a chrono in the name of the file.
     - Format: mmddyyyyhhmmss
   
-    - generateLogFile: Y|N. Set to "Y" if you want a log file
+  - generateLogFile: Y|N. Set to "Y" if you want a log file
   
   - checkIfLogIn: Y|N. Set to "Y" if you want to check if log in to Azure is done
   
@@ -580,26 +685,25 @@ if ($globalLog) {
     - delimiter: indicate the delimiter in the .csv file
   
   - osTypeFilter: Os Type to filter. by default "Windows"
-  - hybridBenefit: {
+  
+  - hybridBenefit: Indicates LicenseType to match with AHB
     "licenseType": "Windows_Server",
     "name": "Hybrid Benefit"
-  }
-    - Indicates LicenseType to match with AHB
   
-    - virtualDesktop: {
+  - virtualDesktop: Indicates LicenseType to match with Azure Virtual Desktop
     "licenseType": "Windows_Client",
     "name": "Azure Virtual Desktop"
-  }
-    - Indicates LicenseType to match with Azure Virtual Desktop
   
   - weightLicenseInCores: Indicates the number of cores for 1 AHB License (by default 8)
   
-  - tags: {
-    "environment": "Environment",
-    "availability": "ServiceWindows"
-  }
-    - Tag Environment defined in Azure
-    - Tag Availability defined in Azure
+  - metrics: for the calculation of CPU and Memory usage
+    "cpuUsage": Metric name for CPU usage
+    "memoryAvailable": Metric name to retrieve the memory available in bytes
+    "retentionDays": number of days to calculate CPU Usage & Memory Available. Must be Less or equal than 30
+
+  - tags: 
+    "environment": Tag Environment defined in Azure
+    "availability": Tag Availability defined in Azure
 
   .INPUTS
   Optional : -Verbose to have progress informations on console

@@ -474,13 +474,13 @@ if ($globalLog) {
     - Directory where to store results.
     - Format : "C:/Path/subPath/.../"
   
-    - fileResult: name of result file and log file (by default, GetAzAhb)
+  - fileResult: name of result file and log file (by default, GetAzAhb)
   
-    - chronoFile: Y|N.
+  - chronoFile: Y|N.
     - Set to "Y" if you want a chrono in the name of the file.
     - Format: mmddyyyyhhmmss
   
-    - generateLogFile: Y|N. Set to "Y" if you want a log file
+  - generateLogFile: Y|N. Set to "Y" if you want a log file
   
   - checkIfLogIn: Y|N. Set to "Y" if you want to check if log in to Azure is done
 

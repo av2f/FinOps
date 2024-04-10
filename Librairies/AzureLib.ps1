@@ -242,3 +242,95 @@ function Get-RoleOwnerSubscription
   }
   return $ownerAssignment, $count
 }
+# ----------------------------------------------------------
+function GetAvgCpuUsage
+{
+  <#
+    Calculate the Average CPU Usage in percentage for
+    a resource Id and for a retention in days
+    Input:
+      - $resourceId: Resource Id to calculate CPU usage
+      - $metric: Metric to use to calculate
+      - $retentionDays: Number of days to calculate the average. Limit max = 30 days
+    Output:
+      - $resAvgCpuUsage: Average in percentage of CPU usage during the last $retentionDays
+  #>
+  param(
+    [String]$resourceId,
+    [String]$metric,
+    [Int16]$retentionDays
+  )
+  # Define Start and End dates
+  $startTime = (Get-Date).AddDays(-$retentionDays)
+  $endTime = (Get-Date)
+
+  # if $retentionDays > 30 days, set up to 7 days
+  if ($retentionDays -gt 30) {
+    $retentionDays = 7
+  }
+  
+  $resAvgCpuUsage = 0
+  # Retrieve Average CPU usage in percentage
+  $avgCpus = (Get-AzMetric -ResourceId $resourceId -MetricName $metric -StartTime $startTime -EndTime $endTime -AggregationType Average -TimeGrain 1.00:00:00 |
+    ForEach-Object { $_.Data.Average })
+  
+    # Calculate Average of CPU usage in percentage
+  foreach ($avgCpu in $avgCpus) {
+    $resAvgCpuUsage += $avgCpu
+  }
+  return [Math]::Round($resAvgCpuUsage/$avgCpus.count,2)
+}
+# ----------------------------------------------------------
+function GetAvgMemUsage
+{
+  <#
+    Calculate the Average Memory (RAM) Usage in percentage for
+    a resource Id and for a retention in days
+    Input:
+      - $resourceId: Resource Id to calculate RAM usage
+      - $metric: Metric to use to calculate
+      - $retentionDays: Number of days to calculate the average. Limit max = 30 days
+      - $vmMemory: RAM in MB of the VM the resource Id
+
+    Output:
+      - $resAvgMemUsage: Average in MB of RAM usage during the last $retentionDays
+  #>
+  param(
+    [String]$resourceId,
+    [String]$metric,
+    [Int16]$retentionDays,
+    [Int]$vmMemory
+  )
+  # Define Start and End dates
+
+  # Process if $vmMemory greater than 0
+  If ($vmMemory -gt 0) {
+    $resAvgMemUsage = 0
+    
+    $startTime = (Get-Date).AddDays(-$retentionDays)
+    $endTime = (Get-Date)
+
+    # if $retentionDays > 30 days, set up to 7 days
+    if ($retentionDays -gt 30) {
+      $retentionDays = 7
+    }
+
+    # Retrieve Average of available RAM in Bytes
+    $avgAvailableMems = (Get-AzMetric -ResourceId $resourceId -MetricName $metric -StartTime $startTime -EndTime $endTime -AggregationType Average -TimeGrain 1.00:00:00 |
+      ForEach-Object { $_.Data.Average })
+    
+      # Calculate Average of Memory usage in percentage
+    foreach ($avgAvailableMem in $avgAvailableMems) {
+      # if value is null, $avgAvailableMem = $vmMemory in Bytes
+      if ($null -eq $avgAvailableMem) {
+        $avgAvailableMem = $vmMemory * 1024 * 1024
+      }
+      $resAvgMemUsage += (($vmMemory - ($avgAvailableMem/(1024*1024))) * 100) / $vmMemory
+      $resAvgMemUsage = [Math]::Round($resAvgMemUsage/$avgAvailableMems.count,2)
+    }
+  }
+  # else $resAvgMemUsage = 0
+  else { $resAvgMemUsage = 0 }
+  
+  return $resAvgMemUsage
+}
