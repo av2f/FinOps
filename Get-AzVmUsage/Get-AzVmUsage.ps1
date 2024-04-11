@@ -230,7 +230,7 @@ function GetVmsFromRg
   return $resVms
 }
 
-function GetAllVmInfo
+function GetVmInfo
 {
   <#
     Retrieve for VM:
@@ -294,23 +294,39 @@ function GetVmSizing
   return $resSizing
 }
 
-function GetAvgCpuUsage
+function GetPercentCpuUsage
 {
   <#
-    Calculate the Average CPU Usage in percentage for
-    a resource Id and for a retention in days
+    Calculate in percentage for a resource Id and for a retention in days
+      - the Average CPU usage
+      - the Max CPU usage reached
+      - the Min CPU usage reached
+      - the number of time the limit is reached
     Input:
       - $resourceId: Resource Id to calculate CPU usage
       - $metric: Metric to use to calculate
       - $retentionDays: Number of days to calculate the average. Limit max = 30 days
+      - $timeGrain: Granularity of time
+      - $limitCpu: in percentage, to calculate the number of time this limit is reached
     Output:
-      - $resAvgCpuUsage: Average in percentage of CPU usage during the last $retentionDays
+      - $calcCpuUsage: Array with data calculated
   #>
   param(
     [String]$resourceId,
     [String]$metric,
-    [Int16]$retentionDays
+    [Int16]$retentionDays,
+    [TimeSpan]$timeGrain,
+    [Int16]$limitCpu
   )
+  
+  # Initiate Result Array
+  $calcCpuUsage = @{
+    average = 0
+    maxReached = 0
+    minReached = 100
+    countLimitReached = 0
+  }
+  
   # Define Start and End dates
   $startTime = (Get-Date).AddDays(-$retentionDays)
   $endTime = (Get-Date)
@@ -319,56 +335,81 @@ function GetAvgCpuUsage
   if ($retentionDays -gt 30) {
     $retentionDays = 30
   }
-  
-  $resAvgCpuUsage = 0
+
   # Retrieve Average CPU usage in percentage
-  $avgCpus = (Get-AzMetric -ResourceId $resourceId -MetricName $metric -StartTime $startTime -EndTime $endTime -AggregationType Average -TimeGrain 01:00:00 |
-    ForEach-Object { $_.Data.Average })
+  $avgCpus = (
+    Get-AzMetric -ResourceId $resourceId -MetricName $metric -StartTime $startTime -EndTime $endTime -AggregationType Average -TimeGrain $timeGrain |
+      ForEach-Object { $_.Data.Average }
+  )
   
     # Calculate Average of CPU usage in percentage
   foreach ($avgCpu in $avgCpus) {
-    $resAvgCpuUsage += $avgCpu
+    $calcCpuUsage['average'] += $avgCpu
+    # Max processing
+    if ([Math]::Round($avgCpu,2) -gt $calcCpuUsage['maxReached']) { $calcCpuUsage['maxReached'] = [Math]::Round($avgCpu,2) }
+    # Min Processing
+    if ([Math]::Round($avgCpu,2) -lt $calcCpuUsage['minReached']) { $calcCpuUsage['minReached'] = [Math]::Round($avgCpu,2) }
+    # Limit Processing
+    if ($avgCpu -ge $limitCpu) { $calcCpuUsage['countLimitReached'] += 1 }
   }
-  return [Math]::Round($resAvgCpuUsage/$avgCpus.count,2)
+  # Average processing
+  $calcCpuUsage['average'] = [Math]::Round($calcCpuUsage['average']/$avgCpus.count,2)
+  
+  return $calcCpuUsage
 }
 
-function GetAvgMemUsage
+function GetPercentMemUsage
 {
   <#
-    Calculate the Average Memory (RAM) Usage in percentage for
-    a resource Id and for a retention in days
+    Calculate in percentage for a resource Id and for a retention in days
+      - the Average Memory usage
+      - the Max Memory usage reached
+      - the Min Memory usage reached
+      - the number of time the limit is reached
     Input:
       - $resourceId: Resource Id to calculate RAM usage
       - $metric: Metric to use to calculate
       - $retentionDays: Number of days to calculate the average. Limit max = 30 days
       - $vmMemory: RAM in MB of the VM the resource Id
-
+      - $timeGrain: Granularity of time
     Output:
-      - $resAvgMemUsage: Average in MB of RAM usage during the last $retentionDays
+      - $calcMemUsage: Array with data calculated
   #>
   param(
     [String]$resourceId,
     [String]$metric,
     [Int16]$retentionDays,
-    [Int]$vmMemory
+    [Int]$vmMemory,
+    [TimeSpan]$timeGrain,
+    [Int16]$limitMem
   )
-  # Define Start and End dates
-
+  
+  # Initiate Result Array
+  $calcMemUsage = @{
+    average = 0
+    maxReached = 0
+    minReached = 100
+    countLimitReached = 0
+  }
+  
   # Process if $vmMemory greater than 0
   If ($vmMemory -gt 0) {
-    $resAvgMemUsage = 0
     
+    # Define Start and End dates
     $startTime = (Get-Date).AddDays(-$retentionDays)
     $endTime = (Get-Date)
 
+  
     # if $retentionDays > 30 days, set up to 30 days
     if ($retentionDays -gt 30) {
       $retentionDays = 30
     }
 
     # Retrieve Average of available RAM in Bytes
-    $avgAvailableMems = (Get-AzMetric -ResourceId $resourceId -MetricName $metric -StartTime $startTime -EndTime $endTime -AggregationType Average -TimeGrain 01:00:00 |
-      ForEach-Object { $_.Data.Average })
+    $avgAvailableMems = (
+      Get-AzMetric -ResourceId $resourceId -MetricName $metric -StartTime $startTime -EndTime $endTime -AggregationType Average -TimeGrain $timeGrain |
+        ForEach-Object { $_.Data.Average }
+    )
     
       # Calculate Average of Memory usage in percentage
     foreach ($avgAvailableMem in $avgAvailableMems) {
@@ -376,14 +417,24 @@ function GetAvgMemUsage
       if ($null -eq $avgAvailableMem) {
         $avgAvailableMem = $vmMemory * 1024 * 1024
       }
-      $resAvgMemUsage += (($vmMemory - ($avgAvailableMem/(1024*1024))) * 100) / $vmMemory
-      $resAvgMemUsage = [Math]::Round($resAvgMemUsage/$avgAvailableMems.count,2)
+      # Convert in MB and in percentage
+      $avgAvailableMem = (($vmMemory - ($avgAvailableMem/(1024*1024))) * 100) / $vmMemory
+      # $avgMemUsage += (($vmMemory - ($avgAvailableMem/(1024*1024))) * 100) / $vmMemory
+      $calcMemUsage['average'] += [Math]::Round($avgAvailableMem,2)
+      # Max processing
+      if ([Math]::Round($avgAvailableMem,2) -gt $calcMemUsage['maxReached']) { $calcMemUsage['maxReached'] = [Math]::Round($avgAvailableMem,2) }
+      # Min Processing
+      if ([Math]::Round($avgAvailableMem,2) -lt $calcMemUsage['minReached']) { $calcMemUsage['minReached'] = [Math]::Round($avgAvailableMem,2) }
+      # Limit Processing
+      if ($avgAvailableMem -ge $limitMem) { $calcMemUsage['countLimitReached'] += 1 }
     }
+      # Average processing
+      $calcMemUsage['average'] = [Math]::Round($calcMemUsage['average']/$avgAvailableMems.count,2)
   }
-  # else $resAvgMemUsage = 0
-  else { $resAvgMemUsage = 0 }
+  # else all result from array = 0
+  else { $calcMemUsage['minReached'] = 0 }
   
-  return $resAvgMemUsage
+  return $calcMemUsage
 }
 
 function SetObjResult {
@@ -444,8 +495,6 @@ if ($globalVar.checkIfLogIn.ToUpper() -eq "Y") { CheckIfLogIn }
 
 # retrieve Subscriptions
 $subscriptions = (GetSubscriptions -scope $globalVar.subscriptionsScope)
-# For Tests = Only DXC Subcriptions
-# $subscriptions = Get-AzSubscription | Where-Object { ($_.Name -clike "*DXC*") -and ($_.State -eq "Enabled") }
 # --
 Write-Verbose "$($subscriptions.Count) subscriptions found."
 if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: $($subscriptions.Count) subscriptions found.") }
@@ -471,7 +520,7 @@ if ($subscriptions.Count -ne 0) {
     Write-Verbose "-- $($resourceGroupNamesCount) Resource Groups found"
     if ($resourceGroupNamesCount -ne 0) {
       foreach ($resourceGroupName in $resourceGroupNames) {
-        $objVmResult = @()
+        $countVm = 0
         $arrayVm = @()
         <# ------------
           VMs processing
@@ -484,36 +533,45 @@ if ($subscriptions.Count -ne 0) {
         # as there is a bug with .Count when only 1 VM, replace by "$vms | Measure-Object | ForEach-Object count"
         if ($($vms | Measure-Object | ForEach-Object count) -ne 0) {
           $vmTotal = 0
-          $countVm = 0
           foreach ($vm in $vms) {
             # -- Retrieve VM informations
             $vmInfos = GetVmInfo -rgName $resourceGroupName.ResourceGroupName -vmName $vm.Name
             # if VM matching with $globalVar.osTypeFilter
             if ($vmInfos.Count -ne 0) {
               # -- Retrieve VM sizing
-              $vmSizing = GetVmSizing -rgName $resourceGroupName.ResourceGroupName -vmName $vm.Name -sku $vmInfos[3]
+              $vmSizing = GetVmSizing -rgName $resourceGroupName.ResourceGroupName -vmName $vm.Name -sku $vmInfos[2]
               # -- Calculate CPU usage in percentage
-              $avgPercentCpu = (GetAvgCpuUsage -resourceId $vmInfos[0] -metric $globalVar.metrics.cpuUsage -retentionDays $globalVar.metrics.retentionDays)
+              $avgPercentCpu = (
+                GetPercentCpuUsage -resourceId $vmInfos[0] -metric $globalVar.metrics.cpuUsage -retentionDays $globalVar.metrics.retentionDays -timeGrain 01:00:00 -limitCpu $globalVar.limitCountCpu
+              )
               # -- Calculate Memory usage in percentage
-              $avgPercentMem = (GetAvgMemUsage -ResourceId $vmInfos[0] -metric $globalVar.metrics.memoryAvailable -retentionDays $globalVar.metrics.retentionDays -vmMemory $vmSizing.MemoryInMB)
+              $avgPercentMem = (
+                GetPercentMemUsage -ResourceId $vmInfos[0] -metric $globalVar.metrics.memoryAvailable -retentionDays $globalVar.metrics.retentionDays -vmMemory $vmSizing.MemoryInMB -timeGrain 01:00:00 -limitMem $globalVar.limitCountMem
+              )
               # Aggregate informations
-              $objVmResult += SetObjResult @(
+              $arrayVm += SetObjResult @(
                 $subscription.Name, $resourceGroupName.ResourceGroupName,
                 $vm.Name, $vm.Location, $vm.PowerState,
                 $vmInfos[1], $vm.OsName, $vmInfos[2],
                 $vmSizing.NumberOfCores, $vmSizing.MemoryInMB,
-                $avgPercentCpu, "Max_CPU", "Min_CPU", "Limit_Count_CPU", $avgPercentMem, "Max_Mem", "Min_Mem", "Limit_Count_Mem"
+                $avgPercentCpu['average'], $avgPercentCpu['maxReached'], $avgPercentCpu['minReached'], $avgPercentCpu['countLimitReached'],
+                $avgPercentMem['average'], $avgPercentMem['maxReached'], $avgPercentMem['minReached'], $avgPercentMem['countLimitReached']
               )
             }
-            # GESTION DE $countVM
             $vmTotal += 1
+            $countVm += 1
+            # if number of resources = SaveEvery in json file parameter, write in the result file and re-initiate the array and counter
+            if ($countVm -eq $globalVar.saveEvery) {
+              $arrayVm | Export-Csv -Path $csvResFile -Delimiter ";" -NoTypeInformation -Append
+              $arrayVm = @()
+              $countVm = 0
+            }
           }
           if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: $vmTotal VMs found and processed") }
           Write-Verbose "--- $vmTotal VMs found and processed"
         }
-        # Write in results in result file
-        $arrayVm += $objVmResult
-        $arrayVm | Export-Csv -Path $csvResFile -Delimiter ";" -NoTypeInformation -Append
+        # Write last Vms
+        if ($countVm -gt 0) { $arrayVm | Export-Csv -Path $csvResFile -Delimiter ";" -NoTypeInformation -Append }
       }
     }
     Write-Verbose "---------------------------------------------"

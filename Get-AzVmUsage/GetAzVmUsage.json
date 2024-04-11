@@ -1,11 +1,11 @@
 {
-  "pathResult": "C:/Users/fparment/Documents/AzFinOps/Data/GetAzAhb/",
-  "fileResult": "GetAzAhb",
+  "pathResult": "C:/Users/fparment/Documents/AzFinOps/Data/GetAzVmUsage/",
+  "fileResult": "GetAzVmUsage",
   "chronoFile": "N",
   "generateLogFile": "Y",
   "checkIfLogIn": "Y",
   "subscriptionsScope": {
-    "scope": "All",
+    "scope": "C:/Users/fparment/Documents/AzFinOps/Data/Alstom/subscriptions.csv",
     "delimiter": ";"
   },
   "metrics": {
@@ -14,7 +14,7 @@
     "retentionDays": 30,
     "timeGrain": "01:00:00"
   },
-  "limitCountCPU": 70,
+  "limitCountCpu": 70,
   "limitCountMem": 80,
   "saveEvery": 100
 }

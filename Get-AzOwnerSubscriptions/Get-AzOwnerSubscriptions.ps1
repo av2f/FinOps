@@ -284,9 +284,6 @@ if ($globalVar.checkIfLogIn.ToUpper() -eq "Y") { CheckIfLogIn }
 
 # retrieve Subscriptions
 $subscriptions = (GetSubscriptions -scope $globalVar.subscriptionsScope)
-# For Tests = Only Subcriptions that contains 'DXC'
-# $subscriptions = Get-AzSubscription | Where-Object { ($_.Name -clike "*DXC*") -and ($_.State -eq "Enabled") }
-# --
 
 if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: $($subscriptions.Count) subscriptions found.") }
 Write-Verbose "$($subscriptions.Count) subscriptions found."

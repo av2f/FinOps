@@ -363,7 +363,6 @@ CheckSaveEvery -saveEvery $globalVar.saveEvery
 if ($globalVar.checkIfLogIn.ToUpper() -eq "Y") { CheckIfLogIn }
 
 # retrieve Subscriptions
-# $subscriptions = Get-AzSubscription | Where-Object {($_.Name -clike "*DXC*") -and ($_.State -eq "Enabled")}
 $subscriptions = (GetSubscriptions -scope $globalVar.subscriptionsScope)
 Write-Verbose "$($subscriptions.Count) subscriptions found."
 if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: $($subscriptions.Count) subscriptions found.") }

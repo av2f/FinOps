@@ -26,5 +26,6 @@
   "tags": {
     "environment": "Environment",
     "availability": "ServiceWindows"
-  }
+  },
+  "saveEvery": 100
 }
