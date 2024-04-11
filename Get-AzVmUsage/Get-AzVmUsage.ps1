@@ -315,9 +315,9 @@ function GetAvgCpuUsage
   $startTime = (Get-Date).AddDays(-$retentionDays)
   $endTime = (Get-Date)
 
-  # if $retentionDays > 30 days, set up to 7 days
+  # if $retentionDays > 30 days, set up to 30 days
   if ($retentionDays -gt 30) {
-    $retentionDays = 7
+    $retentionDays = 30
   }
   
   $resAvgCpuUsage = 0
@@ -361,9 +361,9 @@ function GetAvgMemUsage
     $startTime = (Get-Date).AddDays(-$retentionDays)
     $endTime = (Get-Date)
 
-    # if $retentionDays > 30 days, set up to 7 days
+    # if $retentionDays > 30 days, set up to 30 days
     if ($retentionDays -gt 30) {
-      $retentionDays = 7
+      $retentionDays = 30
     }
 
     # Retrieve Average of available RAM in Bytes
@@ -395,7 +395,7 @@ function SetObjResult {
   param(
     [array]$listResult
   )
-  if ($listResult.Count -ne 16) {
+  if ($listResult.Count -ne 18) {
     $listResult = @('-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-','-','-')
   }
   $objTagResult = @(
@@ -413,9 +413,11 @@ function SetObjResult {
       Avg_CPU_Usage_Percent = $listResult[10]
       Max_CPU_Usage_Percent = $listResult[11]
       Min_CPU_Usage_Percent = $listResult[12]
-      Avg_Mem_Usage_Percent = $listResult[13]
-      Max_Mem_Usage_Percent = $listResult[14]
-      Min_Mem_Usage_Percent = $listResult[15]
+      Limit_Count_CPU = $listResult[13]
+      Avg_Mem_Usage_Percent = $listResult[14]
+      Max_Mem_Usage_Percent = $listResult[15]
+      Min_Mem_Usage_Percent = $listResult[16]
+      Limit_Count_Mem = $listResult[17]
     }
   )
   return $objTagResult
@@ -463,9 +465,11 @@ if ($subscriptions.Count -ne 0) {
     Write-Verbose "-- Processing of Resource Groups from $($subscription.Name)"
     # Retrieve Resource groups names from the subscription
     $resourceGroupNames = (Get-AzResourceGroup | Select-Object -Property ResourceGroupName | Sort-Object ResouceGroupName)
-    if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: $($resourceGroupNames.Count) Resource Groups found") }
-    Write-Verbose "-- $($resourceGroupNames.Count) Resource Groups found"
-    if ($resourceGroupNames.Count -ne 0) {
+    # As there is a bug with .Count when only 1 resource group, replace by "$resourceGroupNames | Measure-Object | ForEach-Object count"
+    $resourceGroupNamesCount = $resourceGroupNames | Measure-Object | ForEach-Object Count
+    if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: $($resourceGroupNamesCount) Resource Groups found") }
+    Write-Verbose "-- $($resourceGroupNamesCount) Resource Groups found"
+    if ($resourceGroupNamesCount -ne 0) {
       foreach ($resourceGroupName in $resourceGroupNames) {
         $objVmResult = @()
         $arrayVm = @()
@@ -480,6 +484,7 @@ if ($subscriptions.Count -ne 0) {
         # as there is a bug with .Count when only 1 VM, replace by "$vms | Measure-Object | ForEach-Object count"
         if ($($vms | Measure-Object | ForEach-Object count) -ne 0) {
           $vmTotal = 0
+          $countVm = 0
           foreach ($vm in $vms) {
             # -- Retrieve VM informations
             $vmInfos = GetVmInfo -rgName $resourceGroupName.ResourceGroupName -vmName $vm.Name
@@ -497,9 +502,10 @@ if ($subscriptions.Count -ne 0) {
                 $vm.Name, $vm.Location, $vm.PowerState,
                 $vmInfos[1], $vm.OsName, $vmInfos[2],
                 $vmSizing.NumberOfCores, $vmSizing.MemoryInMB,
-                $avgPercentCpu, "Max_CPU", "Min_CPU", $avgPercentMem, "Max_Mem", "Min_Mem"
+                $avgPercentCpu, "Max_CPU", "Min_CPU", "Limit_Count_CPU", $avgPercentMem, "Max_Mem", "Min_Mem", "Limit_Count_Mem"
               )
             }
+            # GESTION DE $countVM
             $vmTotal += 1
           }
           if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: $vmTotal VMs found and processed") }

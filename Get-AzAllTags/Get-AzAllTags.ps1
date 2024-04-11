@@ -387,10 +387,12 @@ if ($subscriptions.Count -ne 0) {
     if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Processing of Resource Groups from $($subscription.Name)") }
     Write-Verbose "-- Processing of Resource Groups from $($subscription.Name)"
     $resourceGroups = (Get-AzResourceGroup | Select-Object -Property ResourceGroupName, Location, Tags, ResourceId | Sort-Object Location, ResouceGroupName)
-    if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: $($resourceGroups.Count) Resource Groups found") }
-    Write-Verbose "-- $($resourceGroups.Count) Resource Groups found"
+    # As there is a bug with .Count when only 1 resource group, replace by "$resourceGroups | Measure-Object | ForEach-Object count"
+    $resourceGroupsCount = $resourceGroups | Measure-Object | ForEach-Object Count
+    if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: $($resourceGroupsCount) Resource Groups found") }
+    Write-Verbose "-- $($resourceGroupsCount) Resource Groups found"
     
-    if ($resourceGroups.Count -ne 0) {
+    if ($resourceGroupsCount -ne 0) {
       foreach ($resourceGroup in $resourceGroups) {
         $arrayTags = @()
         # Retrieve resource group Tags and write in result file
@@ -402,7 +404,7 @@ if ($subscriptions.Count -ne 0) {
         if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Processing of Resources from Resource Group $($resourceGroup.ResourceGroupName)") }
         Write-Verbose "--- Processing of Resources from Resource Group $($resourceGroup.ResourceGroupName)"
         $resources = (Get-AzResource -ResourceGroupName $resourceGroup.ResourceGroupName | Select-Object -Property Name, ResourceType, Location, ResourceId, Tags | Sort-Object Location, Name)
-        # as there is a bug with .Count when only 1 resource, replace by "$resources | Measure-Object | ForEach-Object count"
+        # As there is a bug with .Count when only 1 resource, replace by "$resources | Measure-Object | ForEach-Object count"
         $numberOfResources = $($resources | Measure-Object | ForEach-Object count)
         
         if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: $($numberOfResources) Resources found") }

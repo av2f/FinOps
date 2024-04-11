@@ -555,11 +555,12 @@ if ($subscriptions.Count -ne 0) {
     Write-Verbose "-- Processing of Resource Groups from $($subscription.Name)"
     # Retrieve Resource groups names from the subscription
     $resourceGroupNames = (Get-AzResourceGroup | Select-Object -Property ResourceGroupName | Sort-Object ResouceGroupName)
-    if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: $($resourceGroupNames.Count) Resource Groups found") }
-    Write-Verbose "-- $($resourceGroupNames.Count) Resource Groups found"
-    if ($resourceGroupNames.Count -ne 0) {
+    # As there is a bug with .Count when only 1 resource group, replace by "$resourceGroupNames | Measure-Object | ForEach-Object count"
+    $resourceGroupNamesCount = $resourceGroupNames | Measure-Object | ForEach-Object Count
+    if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: $($resourceGroupNamesCount) Resource Groups found") }
+    Write-Verbose "-- $($resourceGroupNamesCount) Resource Groups found"
+    if ($resourceGroupNamesCount -ne 0) {
       foreach ($resourceGroupName in $resourceGroupNames) {
-        $objVmResult = @()
         $arrayVm = @()
         <# ------------
           VMs processing
@@ -569,7 +570,7 @@ if ($subscriptions.Count -ne 0) {
         Write-Verbose "--- Processing of VMs from Resource Group $($resourceGroupName.ResourceGroupName)"
         $vms = GetVmsFromRg -rgName $resourceGroupName
         # Continue if there are Virtual Machines
-        # as there is a bug with .Count when only 1 VM, replace by "$vms | Measure-Object | ForEach-Object count"
+        # As there is a bug with .Count when only 1 VM, replace by "$vms | Measure-Object | ForEach-Object count"
         if ($($vms | Measure-Object | ForEach-Object count) -ne 0) {
           $windowsVm = 0  # Count number of Windows VM in the RG
           foreach ($vm in $vms) {
@@ -587,7 +588,7 @@ if ($subscriptions.Count -ne 0) {
               # -- Calculate Memory usage in percentage
               $avgPercentMem = (GetAvgMemUsage -ResourceId $vmInfos[0] -metric $globalVar.metrics.memoryAvailable -retentionDays $globalVar.metrics.retentionDays -vmMemory $vmSizing.MemoryInMB)
               # Aggregate informations
-              $objVmResult += SetObjResult @(
+              $arrayVm += SetObjResult @(
                 $subscription.Name, $subscription.Id, $resourceGroupName.ResourceGroupName,
                 $vm.Name, $vm.Location, $vm.PowerState,
                 $vmInfos[1], $vm.OsName, $vmInfos[2],
@@ -601,7 +602,7 @@ if ($subscriptions.Count -ne 0) {
           Write-Verbose "--- $windowsVm VMs Windows found and processed"
         }
         # Write in results in result file
-        $arrayVm += $objVmResult
+        # $arrayVm += $objVmResult
         $arrayVm | Export-Csv -Path $csvResFile -Delimiter ";" -NoTypeInformation -Append
       }
     }
