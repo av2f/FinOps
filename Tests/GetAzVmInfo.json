@@ -1,0 +1,18 @@
+{
+  "pathResult": "C:/Users/fparment/Documents/AzFinOps/Data/GetAzVmInfo/",
+  "fileResult": "GetAzVmInfo",
+  "chronoFile": "N",
+  "generateLogFile": "Y",
+  "checkIfLogIn": "Y",
+  "subscriptionsScope": {
+    "scope": "C:/Users/fparment/Documents/AzFinOps/Data/Alstom/subscriptions.csv",
+    "delimiter": ";"
+  },
+  "osTypeFilter": "Windows",
+
+  "tags": {
+    "environment": "Environment",
+    "availability": "ServiceWindows"
+  },
+  "saveEvery": 100
+}
