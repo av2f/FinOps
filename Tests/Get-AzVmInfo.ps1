@@ -174,7 +174,7 @@ function GetWinVmInfoFromSubscription
   #>
 
   $listVms = (Get-AzVm -Status) | Select-Object -Property ResourceGroupName, Name, Id, VmId, Location, PowerState, OsName, LicenseType,
-  @{l="VmSize";e={$_.HardwareProfile.VmSize}}, @{l="OsType";e={$_.StorageProfile.OSDisk.OsType}}
+  @{l="OsType";e={$_.StorageProfile.OSDisk.OsType}}, @{l="VmSize";e={$_.HardwareProfile.VmSize}}
   return $listVms
 }
 
@@ -253,7 +253,7 @@ if ($subscriptions.Count -ne 0) {
     if ($VmsCount -gt 0) {
       $arrayVms=@()
       foreach ($vm in $listVms) {
-        $arrayVms += SetObjResult($subscription.Name, $subscription.id,$vm.ResouceGroupName,
+        $arrayVms += SetObjResult($subscription.Name, $subscription.id,$vm.ResourceGroupName,
         $vm.Name, $vm.Id, $vm.VmId, $vm.Location, $vm.PowerState, $vm.OsType, $vm.OsName, $vm.LicenseType,
         $vm.VmSize)
       }

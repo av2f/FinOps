@@ -112,7 +112,34 @@ function GetSubscriptions
     # Check if file exists
     if (Test-Path -Path $scope.scope -PathType Leaf) {
       # Retrieve Subscriptions in .csv file
-      $listSubscriptions = Import-Csv -Path $scope.scope -Delimiter $scope.delimiter
+      $srcListSubscriptions = Import-Csv -Path $scope.scope -Delimiter $scope.delimiter
+      
+      # Perform a sanity check of the list
+      Write-Host "Please wait, Cheking the subscription list..."
+      Write-Verbose "Cleaning the subscription list..."
+      if ($globalLog) { WriteLog -fileName $logfile -message "Cleaning the subscription list..." }
+      $listSubscriptions = @()
+      $nbErrorSubscription = 0
+      
+      foreach ($subscription in $srcListSubscriptions) {
+        $GetSubscription = (Get-AzSubscription -SubscriptionId $subscription.Id -ErrorAction SilentlyContinue)
+        # Subscription no longer exists or is disabled
+        if (!$GetSubscription -or $GetSubscription.State -ne "Enabled") {
+          Write-Verbose "the $($subscription.Name) no longer exists or is disabled"
+          if ($globalLog) { WriteLog -fileName $logfile -message "the $($subscription.Name) no longer exists or is disabled" }
+          $nbErrorSubscription +=1
+        }
+        # Else add to array
+        else { $listSubscriptions += $subscription }
+      }
+      if ($nbErrorSubscription -eq 0) {
+        Write-Verbose "All subscriptions on $($listSubscriptions.count) are valid."
+        if ($globalLog) { WriteLog -fileName $logfile -message "All subscriptions on $($listSubscriptions.count) are valid." }
+      }
+      else {
+        Write-Verbose "$nbErrorSubscription subscriptions on $($srcListSubscriptions.count) are no longer valid."
+        if ($globalLog) { WriteLog -fileName $logfile -message "$nbErrorSubscription subscriptions on $($srcListSubscriptions.count) are no longer valid." }
+      }
     }
     else {
       Write-Host "Error: The file defined for subscriptions in Json parameter file was not found."
