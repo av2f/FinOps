@@ -6,6 +6,9 @@ Functions for Azure:
 
 - GetSubscriptions : Retrieves subcriptions from a scope: All or a .csv file with subcription name and Id to process
 
+- GetVmInfoFromSubscription: Retrieve for VMs from the current subscription, retrieving following VMs informations:
+  - ResourceGroupName, VM Name, VM Id, VmId, Location, PowerState, OsType, OsName, LicenseType, VM Size
+
 - GetVmsFromRg: Retrieves for VMs from Resource group $rgName retrieving following VMs informations:
   - Name, Location, OsName, PowerState
   - filter by OsType = Windows
@@ -154,6 +157,37 @@ function GetSubscriptions
     }
   }
   return $listSubscriptions
+}
+# -----------------------------------------------------
+function GetVmInfoFromSubscription
+{
+  <#
+    Retrieve for VMs from the current subscription, retrieving following VMs informations:
+    ResourceGroupName, VM Name, VM Id, VmId, Location, PowerState, OsType, OsName, LicenseType, VM Size
+    Input:
+      - None
+    Output:
+      - $listVms: array of results
+  #>
+
+  param(
+    [String]$subscriptionId
+  )
+  
+  $listVms = @()
+
+  # Retrieve VMs from $subscriptionId with informations
+  try {
+    $listVms = (Get-AzVm -Status) | Select-Object -Property ResourceGroupName, Name, Id, VmId, Location, PowerState, OsName, LicenseType,
+    @{l="OsType";e={$_.StorageProfile.OSDisk.OsType}}, @{l="VmSize";e={$_.HardwareProfile.VmSize}}
+  }
+  catch {
+    Write-Host "An error occured retrieving VMs from Subscription Id $subscriptionId"
+    if ($globalLog) { (WriteLog -fileName $logfile -message "ERROR: An error occured retrieving VMs from Subscription Id $subscriptionId") }
+    $listVms = @('Error', 'Error', 'Error', 'Error','Error', 'Error', 'Error', 'Error','Error', 'Error')
+    $globalError += 1
+  }
+  return $listVms
 }
 # -----------------------------------------------------
 function GetVmsFromRg
@@ -430,19 +464,23 @@ function GetPercentCpuUsage
     Get-AzMetric -ResourceId $resourceId -MetricName $metric -StartTime $startTime -EndTime $endTime -AggregationType Average -TimeGrain $timeGrain |
       ForEach-Object { $_.Data.Average }
   )
-  
+  # If Metrics are available
+  if ($avgCpus.count -gt 0) {
     # Calculate Average of CPU usage in percentage
-  foreach ($avgCpu in $avgCpus) {
-    $calcCpuUsage['average'] += $avgCpu
-    # Max processing
-    if ([Math]::Round($avgCpu,2) -gt $calcCpuUsage['maxReached']) { $calcCpuUsage['maxReached'] = [Math]::Round($avgCpu,2) }
-    # Min Processing
-    if ([Math]::Round($avgCpu,2) -lt $calcCpuUsage['minReached']) { $calcCpuUsage['minReached'] = [Math]::Round($avgCpu,2) }
-    # Limit Processing
-    if ($avgCpu -ge $limitCpu) { $calcCpuUsage['countLimitReached'] += 1 }
+    foreach ($avgCpu in $avgCpus) {
+      $calcCpuUsage['average'] += $avgCpu
+      # Max processing
+      if ([Math]::Round($avgCpu,2) -gt $calcCpuUsage['maxReached']) { $calcCpuUsage['maxReached'] = [Math]::Round($avgCpu,2) }
+      # Min Processing
+      if ([Math]::Round($avgCpu,2) -lt $calcCpuUsage['minReached']) { $calcCpuUsage['minReached'] = [Math]::Round($avgCpu,2) }
+      # Limit Processing
+      if ($avgCpu -ge $limitCpu) { $calcCpuUsage['countLimitReached'] += 1 }
+    }
+    # Average processing
+    $calcCpuUsage['average'] = [Math]::Round($calcCpuUsage['average']/$avgCpus.count,2)
   }
-  # Average processing
-  $calcCpuUsage['average'] = [Math]::Round($calcCpuUsage['average']/$avgCpus.count,2)
+  # else all result from array = 0
+  else { $calcCpuUsage['minReached'] = 0 }
   
   return $calcCpuUsage
 }
@@ -499,26 +537,30 @@ function GetPercentMemUsage
       Get-AzMetric -ResourceId $resourceId -MetricName $metric -StartTime $startTime -EndTime $endTime -AggregationType Average -TimeGrain $timeGrain |
         ForEach-Object { $_.Data.Average }
     )
-    
+    # If Metrics are available
+    if ($avgAvailableMems.count -gt 0) {
       # Calculate Average of Memory usage in percentage
-    foreach ($avgAvailableMem in $avgAvailableMems) {
-      # if value is null, $avgAvailableMem = $vmMemory in Bytes
-      if ($null -eq $avgAvailableMem) {
-        $avgAvailableMem = $vmMemory * 1024 * 1024
+      foreach ($avgAvailableMem in $avgAvailableMems) {
+        # if value is null, $avgAvailableMem = $vmMemory in Bytes
+        if ($null -eq $avgAvailableMem) {
+          $avgAvailableMem = $vmMemory * 1024 * 1024
+        }
+        # Convert in MB and in percentage
+        $avgAvailableMem = (($vmMemory - ($avgAvailableMem/(1024*1024))) * 100) / $vmMemory
+        # $avgMemUsage += (($vmMemory - ($avgAvailableMem/(1024*1024))) * 100) / $vmMemory
+        $calcMemUsage['average'] += [Math]::Round($avgAvailableMem,2)
+        # Max processing
+        if ([Math]::Round($avgAvailableMem,2) -gt $calcMemUsage['maxReached']) { $calcMemUsage['maxReached'] = [Math]::Round($avgAvailableMem,2) }
+        # Min Processing
+        if ([Math]::Round($avgAvailableMem,2) -lt $calcMemUsage['minReached']) { $calcMemUsage['minReached'] = [Math]::Round($avgAvailableMem,2) }
+        # Limit Processing
+        if ($avgAvailableMem -ge $limitMem) { $calcMemUsage['countLimitReached'] += 1 }
       }
-      # Convert in MB and in percentage
-      $avgAvailableMem = (($vmMemory - ($avgAvailableMem/(1024*1024))) * 100) / $vmMemory
-      # $avgMemUsage += (($vmMemory - ($avgAvailableMem/(1024*1024))) * 100) / $vmMemory
-      $calcMemUsage['average'] += [Math]::Round($avgAvailableMem,2)
-      # Max processing
-      if ([Math]::Round($avgAvailableMem,2) -gt $calcMemUsage['maxReached']) { $calcMemUsage['maxReached'] = [Math]::Round($avgAvailableMem,2) }
-      # Min Processing
-      if ([Math]::Round($avgAvailableMem,2) -lt $calcMemUsage['minReached']) { $calcMemUsage['minReached'] = [Math]::Round($avgAvailableMem,2) }
-      # Limit Processing
-      if ($avgAvailableMem -ge $limitMem) { $calcMemUsage['countLimitReached'] += 1 }
-    }
       # Average processing
       $calcMemUsage['average'] = [Math]::Round($calcMemUsage['average']/$avgAvailableMems.count,2)
+    }
+    # else all result from array = 0
+    else { $calcMemUsage['minReached'] = 0 }
   }
   # else all result from array = 0
   else { $calcMemUsage['minReached'] = 0 }

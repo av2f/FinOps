@@ -1,43 +1,45 @@
 <#
-  Name    : Get-AzVmUsage.ps1
+  Name    : Get-AzAhb.ps1
   Author  : Frederic Parmentier
-  Version : 1.5
-  Creation Date : 04/10/2024
+  Version : 1.0
+  Creation Date : 04/02/2024
   
-  Updated date  : 04/17/2024
-  Updated by    : Frederic Parmentier
-  Update done   : Improve function to retrieve VMs informations
-                  Perform a sanity check of list of subscriptions in .csv file removing deleted and disabled
+  Updated date  :
+  Updated by    :
+  Update done   :
 
-  Retrieve CPU and RAM usage for all VMs in subscriptions scope defined
+  Help to optimize Azure Hybrid Benefit (AHB) management
 
   Build a .csv file that contains for each Windows VMs:
   - Subscription Name
+  - Subscription Id
   - Resource Group Name
   - VM Name
   - Location
   - PowerState
   - OS Type
   - OS Name (when specified in Azure)
+  - License Type: 
+    - if "Windows_Server" then AHB is applied
+    - if "Windows_Client" then Azure Virtual Desktop is applied
   - Size of VM
   - Number of Cores of VMs
   - RAM of VMs
-  - Calculate for each VMs during the retention days and the time grain indicated un the Json parameter file:
-    - CPU 
-      + Average CPU usage in percentage
-      + Max CPU usage in percentage
-      + Min CPU usage in percentage
+  - Tag Environment (if exists and specified in the Json file parameter)
+  - Tag Availability (if exists and specified in the Json file parameter)
+  - Calculate for each VMs:
+    - Average CPU usage in percentage during the retention days indicated in the Json parameter file
+    - Average Memory usage in percentage during the retention days indicated in the Json parameter file
+  - Calculate if AHB applied
+    - Number of AHB cores consumed
+    - Number of AHB licenses consumed
+    - Number of AHB cores wasted (based on Number of cores by licenses specified in the Json file parameter)
+    - Number of AHB cores wasted when VM is in powerstate "Deallocated"
+  in result file GetAzAhb[mmddyyyyhhmmss].csv
   
-    - RAM
-      + Average RAM usage in percentage
-      + Max RAM usage in percentage
-      + Min RAM usage in percentage
+  For more information, type Get-Help .\Get-AzAhb.ps1 [-detailed | -full]
 
-      in result file GetAzVmUsage[mmddyyyyhhmmss].csv
-  
-  For more information, type Get-Help .\Get-AzVmUsage.ps1 [-detailed | -full]
-
-  Global variables are stored in .\GetAzVmUsage.json and must be adapted accordingly
+  Global variables are stored in .\GetAzAhb.json and must be adapted accordingly
 #>
 
 <# -----------
@@ -54,7 +56,7 @@ Set-Item -Path Env:\SuppressAzurePowerShellBreakingChangeWarnings -Value $true
   Declare global variables, arrays and objects
 ----------- #>
 # Retrieve global variables from json file
-$globalVar = Get-Content -Raw -Path ".\GetAzVmUsage.json" | ConvertFrom-Json
+$globalVar = Get-Content -Raw -Path ".\GetAzAhb.json" | ConvertFrom-Json
 #
 $globalError = 0  # to count errors
 $globalChronoFile = (Get-Date -Format "MMddyyyyHHmmss") # Format for file with chrono
@@ -161,6 +163,82 @@ function CheckIfLogIn
   }
 }
 
+function ReplaceEmpty
+{
+  <#
+    Replace an empty string by string given in parameter
+    Input:
+      - $checkStr: String to check
+      - $replacedBy: String to set up if $checkStr is empty
+    Output: 
+      - $checkStr
+  #>
+  param(
+    [String]$checkStr,
+    [String]$replacedBy
+  )
+  if ($checkStr -match "^\s*$") { $checkStr = $replacedBy }
+  return $checkStr
+}
+
+function CalcCores
+{
+  <#
+    Retrieve for VM with Hybrid Benefit number of:
+    - Cores consumed
+    - Licenses consumed
+    - Cores wasted
+    Input:
+      - $nbCores: number of cores of the VM
+      - $coresByLicense: Number of cores by license
+      - $licenseType: Type of License applied on VM
+    Output:
+      - $calcCores: array of results
+  #>
+  param(
+    [Int]$nbCores,
+    [Int]$coresByLicense,
+    [String]$licenseType,
+    [String]$powerState
+  )
+
+  $calcCores = @{
+    coresConsumed = 0
+    licensesConsumed = 0
+    coresWasted = 0
+    coresDeallocatedWasted = 0
+  }
+  $stateDeallocated = "deallocated"
+  $floor = [Math]::Floor($nbCores/$coresByLicense)
+  $modulus = $nbCores % $coresByLicense
+  # if License applied is Hybrid Benefit
+  if ($licenseType -eq $globalVar.hybridBenefit.LicenseType) {
+    if ($floor -eq 0 -or $nbCores -eq $coresByLicense) {
+      $calcCores['coresConsumed'] = $coresByLicense
+      $calcCores['licensesConsumed'] = 1
+      $calcCores['coresWasted'] = $coresByLicense - $nbCores
+    }
+    else {
+      switch ($modulus) {
+        { $_ -eq 0 } {
+          $calcCores['coresConsumed'] = $coresByLicense * $floor
+          $calcCores['licensesConsumed'] = $floor
+          $calcCores['coresWasted'] = 0
+        }
+        { $_ -gt 0 } {
+          $calcCores['coresConsumed'] = ($coresByLicense * $floor) + $coresByLicense
+          $calcCores['licensesConsumed'] = $floor + 1
+          $calcCores['coresWasted'] = ($coresByLicense * ($floor + 1)) - $nbCores
+        }
+      }
+    }
+    if ($powerState.ToLower().contains($stateDeallocated)) {
+      $calcCores['coresDeallocatedWasted'] = $calcCores['coresConsumed']
+    }
+  }
+  return $calcCores
+}
+
 function GetSubscriptions
 {
   <#
@@ -227,35 +305,76 @@ function GetSubscriptions
   return $listSubscriptions
 }
 
-function GetVmInfoFromSubscription
+function GetVmsFromRg
 {
   <#
-    Retrieve for VMs from the current subscription, retrieving following VMs informations:
-    ResourceGroupName, VM Name, VM Id, VmId, Location, PowerState, OsType, OsName, LicenseType, VM Size
+    Retrieve for VMs from Resource group $rgName retrieving following VMs informations:
+    Name, Location, OsName, PowerState
+    filter by OsType = Windows
     Input:
-      - None
+      - $rgName: Resource Group Name
     Output:
-      - $listVms: array of results
+      - $resVms: array of results
   #>
-
   param(
-    [String]$subscriptionId
+    [String]$rgName
   )
-  
-  $listVms = @()
 
-  # Retrieve VMs from $subscriptionId with informations
+  $resVms = @()
   try {
-    $listVms = (Get-AzVm -Status) | Select-Object -Property ResourceGroupName, Name, Id, VmId, Location, PowerState, OsName, LicenseType,
-    @{l="OsType";e={$_.StorageProfile.OSDisk.OsType}}, @{l="VmSize";e={$_.HardwareProfile.VmSize}}
+    $resVms = (
+          Get-AzVM -ResourceGroupName $resourceGroupName.ResourceGroupName -Status |
+          Select-Object -Property Name, Location, OsName, PowerState
+        )
   }
   catch {
-    Write-Host "An error occured retrieving VMs from Subscription Id $subscriptionId"
-    if ($globalLog) { (WriteLog -fileName $logfile -message "ERROR: An error occured retrieving VMs from Subscription Id $subscriptionId") }
-    $listVms = @('Error', 'Error', 'Error', 'Error','Error', 'Error', 'Error', 'Error','Error', 'Error')
+    Write-Host "An error occured retrieving VMs from Resource group $rgName"
+    if ($globalLog) { (WriteLog -fileName $logfile -message "ERROR: An error occured retrieving VMs from Resource group $rgName") }
+    $resVms = @('Error', 'Error', 'Error', 'Error')
     $globalError += 1
   }
-  return $listVms
+  return $resVms
+}
+
+function GetVmInfo
+{
+  <#
+    Retrieve for VM:
+    OsType, LicenseType, SKU, Environment and Availibity,
+    filter by OsType = Windows
+    Input:
+      - $rgName: Resource Group Name
+      - $vmName: Virtual Machine Name
+    Output:
+      - $resInfos: array of results
+  #>
+  param(
+    [String]$rgName,
+    [String]$vmName
+  )
+  $resInfos = @()
+  try {
+    $resInfos = (Get-AzVM -ResourceGroupName $rgName -Name $vmName |
+      Where-Object { $_.StorageProfile.OSDisk.OsType -eq $($globalVar.osTypeFilter) } |
+      ForEach-Object {
+        $_.Id, $_.StorageProfile.OSDisk.OsType, $_.LicenseType, $_.HardwareProfile.VmSize,
+        $_.tags.$($globalVar.tags.environment), $_.tags.$($globalVar.tags.availability)
+      }
+    )
+    <#
+    if ($resInfos.count -ne 0) {
+      If Tags are empty, replaced by "-"
+      $resInfos[4] = (ReplaceEmpty -checkStr $resInfos[3] -replacedBy "-")
+      $resInfos[5] = (ReplaceEmpty -checkStr $resInfos[4] -replacedBy "-")
+    } #>
+  }
+  catch {
+    Write-Host "An error occured retrieving VM informations for $vmName"
+    if ($globalLog) { (WriteLog -fileName $logfile -message "ERROR: An error occured retrieving VM informations for $vmName") }
+    $resInfos = @('Error','Error', 'Error', 'Error', 'Error', 'Error')
+    $globalError += 1
+  }
+  return $resInfos
 }
 
 function GetVmSizing
@@ -290,155 +409,101 @@ function GetVmSizing
   return $resSizing
 }
 
-function GetPercentCpuUsage
+function GetAvgCpuUsage
 {
   <#
-    Calculate in percentage for a resource Id and for a retention in days
-      - the Average CPU usage
-      - the Max CPU usage reached
-      - the Min CPU usage reached
-      - the number of time the limit is reached
+    Calculate the Average CPU Usage in percentage for
+    a resource Id and for a retention in days
     Input:
       - $resourceId: Resource Id to calculate CPU usage
       - $metric: Metric to use to calculate
       - $retentionDays: Number of days to calculate the average. Limit max = 30 days
       - $timeGrain: Granularity of time
-      - $limitCpu: in percentage, to calculate the number of time this limit is reached
     Output:
-      - $calcCpuUsage: Array with data calculated
+      - $resAvgCpuUsage: Average in percentage of CPU usage during the last $retentionDays
   #>
   param(
     [String]$resourceId,
     [String]$metric,
     [Int16]$retentionDays,
-    [TimeSpan]$timeGrain,
-    [Int16]$limitCpu
+    [TimeSpan]$timeGrain
   )
-  
-  # Initiate Result Array
-  $calcCpuUsage = @{
-    average = 0
-    maxReached = 0
-    minReached = 100
-    countLimitReached = 0
-  }
-  
   # Define Start and End dates
   $startTime = (Get-Date).AddDays(-$retentionDays)
   $endTime = (Get-Date)
 
-  # if $retentionDays > 30 days, set up to 30 days
+  # if $retentionDays > 30 days, set up to 7 days
   if ($retentionDays -gt 30) {
-    $retentionDays = 30
+    $retentionDays = 7
   }
-
-  # Retrieve Average CPU usage in percentage
-  $avgCpus = (
-    Get-AzMetric -ResourceId $resourceId -MetricName $metric -StartTime $startTime -EndTime $endTime -AggregationType Average -TimeGrain $timeGrain |
-      ForEach-Object { $_.Data.Average }
-  )
-  # If Metrics are available
-  if ($avgCpus.count -gt 0) {
-    # Calculate Average of CPU usage in percentage
-    foreach ($avgCpu in $avgCpus) {
-      $calcCpuUsage['average'] += $avgCpu
-      # Max processing
-      if ([Math]::Round($avgCpu,2) -gt $calcCpuUsage['maxReached']) { $calcCpuUsage['maxReached'] = [Math]::Round($avgCpu,2) }
-      # Min Processing
-      if ([Math]::Round($avgCpu,2) -lt $calcCpuUsage['minReached']) { $calcCpuUsage['minReached'] = [Math]::Round($avgCpu,2) }
-      # Limit Processing
-      if ($avgCpu -ge $limitCpu) { $calcCpuUsage['countLimitReached'] += 1 }
-    }
-    # Average processing
-    $calcCpuUsage['average'] = [Math]::Round($calcCpuUsage['average']/$avgCpus.count,2)
-  }
-  # else all result from array = 0
-  else { $calcCpuUsage['minReached'] = 0 }
   
-  return $calcCpuUsage
+  $resAvgCpuUsage = 0
+  # Retrieve Average CPU usage in percentage
+  $avgCpus = (Get-AzMetric -ResourceId $resourceId -MetricName $metric -StartTime $startTime -EndTime $endTime -AggregationType Average -TimeGrain $timeGrain |
+    ForEach-Object { $_.Data.Average })
+  
+    # Calculate Average of CPU usage in percentage
+  foreach ($avgCpu in $avgCpus) {
+    $resAvgCpuUsage += $avgCpu
+  }
+  return [Math]::Round($resAvgCpuUsage/$avgCpus.count,2)
 }
 
-function GetPercentMemUsage
+function GetAvgMemUsage
 {
   <#
-    Calculate in percentage for a resource Id and for a retention in days
-      - the Average Memory usage
-      - the Max Memory usage reached
-      - the Min Memory usage reached
-      - the number of time the limit is reached
+    Calculate the Average Memory (RAM) Usage in percentage for
+    a resource Id and for a retention in days
     Input:
       - $resourceId: Resource Id to calculate RAM usage
       - $metric: Metric to use to calculate
       - $retentionDays: Number of days to calculate the average. Limit max = 30 days
       - $vmMemory: RAM in MB of the VM the resource Id
       - $timeGrain: Granularity of time
+
     Output:
-      - $calcMemUsage: Array with data calculated
+      - $resAvgMemUsage: Average in MB of RAM usage during the last $retentionDays
   #>
   param(
     [String]$resourceId,
     [String]$metric,
     [Int16]$retentionDays,
     [Int]$vmMemory,
-    [TimeSpan]$timeGrain,
-    [Int16]$limitMem
+    [TimeSpan]$timeGrain
   )
-  
-  # Initiate Result Array
-  $calcMemUsage = @{
-    average = 0
-    maxReached = 0
-    minReached = 100
-    countLimitReached = 0
-  }
-  
+  # Define Start and End dates
+
   # Process if $vmMemory greater than 0
   If ($vmMemory -gt 0) {
+    $resAvgMemUsage = 0
     
-    # Define Start and End dates
     $startTime = (Get-Date).AddDays(-$retentionDays)
     $endTime = (Get-Date)
 
-  
-    # if $retentionDays > 30 days, set up to 30 days
+    # if $retentionDays > 30 days, set up to 7 days
     if ($retentionDays -gt 30) {
-      $retentionDays = 30
+      $retentionDays = 7
     }
 
     # Retrieve Average of available RAM in Bytes
-    $avgAvailableMems = (
-      Get-AzMetric -ResourceId $resourceId -MetricName $metric -StartTime $startTime -EndTime $endTime -AggregationType Average -TimeGrain $timeGrain |
-        ForEach-Object { $_.Data.Average }
-    )
-    # If Metrics are available
-    if ($avgAvailableMems.count -gt 0) {
+    $avgAvailableMems = (Get-AzMetric -ResourceId $resourceId -MetricName $metric -StartTime $startTime -EndTime $endTime -AggregationType Average -TimeGrain $timeGrain |
+      ForEach-Object { $_.Data.Average })
+    
       # Calculate Average of Memory usage in percentage
-      foreach ($avgAvailableMem in $avgAvailableMems) {
-        # if value is null, $avgAvailableMem = $vmMemory in Bytes
-        if ($null -eq $avgAvailableMem) {
-          $avgAvailableMem = $vmMemory * 1024 * 1024
-        }
-        # Convert in MB and in percentage
-        $avgAvailableMem = (($vmMemory - ($avgAvailableMem/(1024*1024))) * 100) / $vmMemory
-        # $avgMemUsage += (($vmMemory - ($avgAvailableMem/(1024*1024))) * 100) / $vmMemory
-        $calcMemUsage['average'] += [Math]::Round($avgAvailableMem,2)
-        # Max processing
-        if ([Math]::Round($avgAvailableMem,2) -gt $calcMemUsage['maxReached']) { $calcMemUsage['maxReached'] = [Math]::Round($avgAvailableMem,2) }
-        # Min Processing
-        if ([Math]::Round($avgAvailableMem,2) -lt $calcMemUsage['minReached']) { $calcMemUsage['minReached'] = [Math]::Round($avgAvailableMem,2) }
-        # Limit Processing
-        if ($avgAvailableMem -ge $limitMem) { $calcMemUsage['countLimitReached'] += 1 }
+    foreach ($avgAvailableMem in $avgAvailableMems) {
+      # if value is null, $avgAvailableMem = $vmMemory in Bytes
+      if ($null -eq $avgAvailableMem) {
+        $avgAvailableMem = $vmMemory * 1024 * 1024
       }
-      # Average processing
-      $calcMemUsage['average'] = [Math]::Round($calcMemUsage['average']/$avgAvailableMems.count,2)
+      $resAvgMemUsage += (($vmMemory - ($avgAvailableMem/(1024*1024))) * 100) / $vmMemory
     }
-    # else all result from array = 0
-    else { $calcMemUsage['minReached'] = 0 }
+    # Calculate Average
+    $resAvgMemUsage = [Math]::Round($resAvgMemUsage/$avgAvailableMems.count,2)
   }
-  # else all result from array = 0
-  else { $calcMemUsage['minReached'] = 0 }
+  # else $resAvgMemUsage = 0
+  else { $resAvgMemUsage = 0 }
   
-  return $calcMemUsage
+  return $resAvgMemUsage
 }
 
 function SetObjResult {
@@ -451,30 +516,30 @@ function SetObjResult {
     [array]$listResult
   )
   if ($listResult.Count -ne 20) {
-    $listResult = @('-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-','-','-','-','-')
+    $listResult = @('-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-','-','-','-','-','-')
   }
   $objTagResult = @(
     [PSCustomObject]@{
       Subscription = $listResult[0]
-      ResourceGroupName = $listResult[1]
-      Vm_Name = $listResult[2]
-      Id = $listResult[3]
-      Resource_Id = $listResult[4]
-      Location = $listResult[5]
-      PowerState = $listResult[6]
-      Os_Type = $listResult[7]
-      Os_Name = $listResult[8]
+      SubscriptionId = $listResult[1]
+      ResourceGroup = $listResult[2]
+      Vm_Name = $listResult[3]
+      Location = $listResult[4]
+      PowerState = $listResult[5]
+      Os_Type = $listResult[6]
+      Os_Name = $listResult[7]
+      License_Type = $listResult[8]
       Size = $listResult[9]
       Nb_Cores = $listResult[10]
       Ram = $listResult[11]
-      Avg_CPU_Usage_Percent = $listResult[12]
-      Max_CPU_Usage_Percent = $listResult[13]
-      Min_CPU_Usage_Percent = $listResult[14]
-      Limit_Count_CPU = $listResult[15]
-      Avg_Mem_Usage_Percent = $listResult[16]
-      Max_Mem_Usage_Percent = $listResult[17]
-      Min_Mem_Usage_Percent = $listResult[18]
-      Limit_Count_Mem = $listResult[19]
+      Tag_Environment = $listResult[12]
+      Tag_Availability = $listResult[13]
+      Avg_CPU_Usage_Percent = $listResult[14]
+      Avg_Mem_Usage_Percent = $listResult[15]
+      Nb_AHB_Cores_Consumed = $listResult[16]
+      Nb_AHB_Licenses_Consumed = $listResult[17]
+      Nb_AHB_Cores_Wasted = $listResult[18]
+      NB_AHB_Cores_Deallocated_Wasted = $listResult[19]
     }
   )
   return $objTagResult
@@ -513,49 +578,74 @@ if ($subscriptions.Count -ne 0) {
     if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Processing of the $($subscription.Name) subscription.") }
     Write-Verbose "- Processing of the $($subscription.Name) subscription."
     Set-AzContext -Subscription $subscription.Id
-    if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Processing of Vms from Subscription $($subscription.Name)") }
-    Write-Verbose "-- Processing of Vms from Subscription $($subscription.Name)"
-    $countVm = 0
-    $arrayVm = @()
-    $vms = GetVmInfoFromSubscription -subscriptionId $subscription.Id
-
-    # Continue if there are Virtual Machines
-    # as there is a bug with .Count when only 1 VM, replace by "$vms | Measure-Object | ForEach-Object count"
-    if ($($vms | Measure-Object | ForEach-Object count) -gt 0) {
-      $vmTotal = 0
-      foreach ($vm in $vms) {
-        # -- Retrieve VM sizing
-        $vmSizing = GetVmSizing -rgName $vm.ResourceGroupName -vmName $vm.Name -sku $vm.VmSize
-        # -- Calculate CPU usage in percentage
-        $avgPercentCpu = (
-          GetPercentCpuUsage -resourceId $vm.Id -metric $globalVar.metrics.cpuUsage -retentionDays $globalVar.metrics.retentionDays -timeGrain 01:00:00 -limitCpu $globalVar.limitCountCpu
-        )
-        # -- Calculate Memory usage in percentage
-        $avgPercentMem = (
-          GetPercentMemUsage -ResourceId $vm.Id -metric $globalVar.metrics.memoryAvailable -retentionDays $globalVar.metrics.retentionDays -vmMemory $vmSizing.MemoryInMB -timeGrain 01:00:00 -limitMem $globalVar.limitCountMem
-        )
-        # Aggregate informations
-        $arrayVm += SetObjResult @(
-          $subscription.Name, $vm.ResourceGroupName,
-          $vm.Name, $vm.Id, $vm.VmId, $vm.Location, $vm.PowerState,
-          $vm.OsType, $vm.OsName, $vm.VmSize,
-          $vmSizing.NumberOfCores, $vmSizing.MemoryInMB,
-          $avgPercentCpu['average'], $avgPercentCpu['maxReached'], $avgPercentCpu['minReached'], $avgPercentCpu['countLimitReached'],
-          $avgPercentMem['average'], $avgPercentMem['maxReached'], $avgPercentMem['minReached'], $avgPercentMem['countLimitReached']
-        )
-        $vmTotal += 1
-        $countVm += 1
-        # if number of resources = SaveEvery in json file parameter, write in the result file and re-initiate the array and counter
-        if ($countVm -eq $globalVar.saveEvery) {
-          $arrayVm | Export-Csv -Path $csvResFile -Delimiter ";" -NoTypeInformation -Append
-          $arrayVm = @()
-          $countVm = 0
+    <# ------------
+      ResourceGroup processing
+    ------------ #>
+    if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Processing of Resource Groups from $($subscription.Name)") }
+    Write-Verbose "-- Processing of Resource Groups from $($subscription.Name)"
+    # Retrieve Resource groups names from the subscription
+    $resourceGroupNames = (Get-AzResourceGroup | Select-Object -Property ResourceGroupName | Sort-Object ResouceGroupName)
+    # As there is a bug with .Count when only 1 resource group, replace by "$resourceGroupNames | Measure-Object | ForEach-Object count"
+    $resourceGroupNamesCount = $resourceGroupNames | Measure-Object | ForEach-Object Count
+    if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: $($resourceGroupNamesCount) Resource Groups found") }
+    Write-Verbose "-- $($resourceGroupNamesCount) Resource Groups found"
+    if ($resourceGroupNamesCount -ne 0) {
+      foreach ($resourceGroupName in $resourceGroupNames) {
+        $arrayVm = @()
+        $countVm = 0
+        <# ------------
+          VMs processing
+          Retrieve VMs from Resource group $resourceGroupName
+        ------------ #>
+        if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Processing of VMs from Resource Group $($resourceGroupName.ResourceGroupName)") }
+        Write-Verbose "--- Processing of VMs from Resource Group $($resourceGroupName.ResourceGroupName)"
+        $vms = GetVmsFromRg -rgName $resourceGroupName
+        # Continue if there are Virtual Machines
+        # As there is a bug with .Count when only 1 VM, replace by "$vms | Measure-Object | ForEach-Object count"
+        if ($($vms | Measure-Object | ForEach-Object count) -ne 0) {
+          $windowsVm = 0  # Count number of Windows VM in the RG
+          foreach ($vm in $vms) {
+            # -- Retrieve VM informations
+            $vmInfos = GetVmInfo -rgName $resourceGroupName.ResourceGroupName -vmName $vm.Name
+            # if VM matching with $globalVar.osTypeFilter
+            if ($vmInfos.Count -ne 0) {
+              # -- Retrieve VM sizing
+              $vmSizing = GetVmSizing -rgName $resourceGroupName.ResourceGroupName -vmName $vm.Name -sku $vmInfos[3]
+              # -- Calculate Cores and Licenses for Hybrid Benefits
+              $resultCores = CalcCores -nbCores $vmSizing.NumberOfCores -coresByLicense $globalVar.weightLicenseInCores -licenseType $vmInfos[2] -powerState $vm.PowerState
+              # -- Calculate CPU usage in percentage
+              $avgPercentCpu = (
+                GetAvgCpuUsage -resourceId $vmInfos[0] -metric $globalVar.metrics.cpuUsage -retentionDays $globalVar.metrics.retentionDays -timeGrain 1.00:00:00
+              )
+              # -- Calculate Memory usage in percentage
+              $avgPercentMem = (
+                GetAvgMemUsage -ResourceId $vmInfos[0] -metric $globalVar.metrics.memoryAvailable -retentionDays $globalVar.metrics.retentionDays -vmMemory $vmSizing.MemoryInMB -timeGrain 1.00:00:00
+              )
+              # Aggregate informations
+              $arrayVm += SetObjResult @(
+                $subscription.Name, $subscription.Id, $resourceGroupName.ResourceGroupName,
+                $vm.Name, $vm.Location, $vm.PowerState,
+                $vmInfos[1], $vm.OsName, $vmInfos[2],
+                $vmInfos[3], $vmSizing.NumberOfCores, $vmSizing.MemoryInMB,
+                $vmInfos[4],$vmInfos[5],$avgPercentCpu, $avgPercentMem, $resultCores['CoresConsumed'],
+                $resultCores['licensesConsumed'], $resultCores['coresWasted'], $resultCores['coresDeallocatedWasted']
+              )
+              $windowsVm += 1
+              $countVm += 1
+              # if number of resources = SaveEvery in json file parameter, write in the result file and re-initiate the array and counter
+              if ($countVm -eq $globalVar.saveEvery) {
+                $arrayVm | Export-Csv -Path $csvResFile -Delimiter ";" -NoTypeInformation -Append
+                $arrayVm = @()
+                $countVm = 0
+              }
+            }
+          }
+          # Write last Vms
+          if ($countVm -gt 0) { $arrayVm | Export-Csv -Path $csvResFile -Delimiter ";" -NoTypeInformation -Append }
+          if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: $windowsVm VMs Windows found and processed") }
+          Write-Verbose "--- $windowsVm VMs Windows found and processed"
         }
       }
-      # Write last Vms
-      if ($countVm -gt 0) { $arrayVm | Export-Csv -Path $csvResFile -Delimiter ";" -NoTypeInformation -Append }
-      if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: $vmTotal VMs found and processed") }
-      Write-Verbose "--- $vmTotal VMs found and processed"
     }
     Write-Verbose "---------------------------------------------"
   }
