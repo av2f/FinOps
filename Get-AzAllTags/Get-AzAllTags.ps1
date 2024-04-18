@@ -306,7 +306,7 @@ function GetSubscriptionTags
   }
   # Store empty line
   else{
-    $subscriptionTags += SetObjResult @($subscription.Name, $subscription.Id, '', '', 'Subscription', '', '', '-', '-')
+    $subscriptionTags += (SetObjResult @($subscription.Name, $subscription.Id, '', '', 'Subscription', '', '', '-', '-'))
   }
   return $subscriptionTags
 }
