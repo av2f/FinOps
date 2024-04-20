@@ -42,8 +42,8 @@ foreach($subscription in $listSubscriptions){
   if ($subscription -match '=([\w\W]*)\(([\w-]*)\)') {
     $subscriptions += @(
       [PSCustomObject]@{
-        Name = $Matches.1
-        Id = $Matches.2
+        Name = $matches.1
+        Id = $matches.2
       }
     )
   }

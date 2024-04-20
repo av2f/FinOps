@@ -1,7 +1,7 @@
 <#
   Name    : Get-AzVmUsage.ps1
   Author  : Frederic Parmentier
-  Version : 1.5
+  Version : 1.5.1
   Creation Date : 04/10/2024
   
   Updated date  : 04/17/2024
@@ -9,6 +9,10 @@
   Update done   : Improve function to retrieve VMs informations
                   Perform a sanity check of list of subscriptions in .csv file removing deleted and disabled
 
+  Updated date  : 04/20/2024
+  Updated by    : Frederic Parmentier
+  Update done   : Add function GetTimeGrain to build the TimeSpan of TimeGrain
+                 
   Retrieve CPU and RAM usage for all VMs in subscriptions scope defined
 
   Build a .csv file that contains for each Windows VMs:
@@ -160,6 +164,42 @@ function CheckIfLogIn
     if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Already connected to Azure") }
   }
 }
+
+function GetTimeGrain
+{
+  <#
+    Create the TimeSpan from the timegrain defined in string
+    the format must be [days.]Hours:Minutes.Seconds (days is optional)
+    if the format provided in paramater is not good, by default result is 1.00:00:00 (1 day)
+    Input :
+      - $timeGrain: String with format [days.]Hours:Minutes.Seconds
+    Output :
+      - $timeSpan: TimeSpan created
+  #>
+
+  param(
+    [String]$timeGrain
+  )
+
+  if ( $timeGrain -match "([0-9])?(.)?([0-2][0-9]):([0-5][0-9]):([0-5][0-9])") {
+    # Format of $timeGrain is OK
+    # Build TimeGrain
+    if ($null -eq $matches[1]) { $days = 0 }
+    else { $days = $matches[1] }
+    $timeSpan = New-TimeSpan -Days $days -Hours $matches[3] -Minutes $matches[4] -Seconds $matches[5]
+    Write-Verbose "TimeGrain defined is $timeSpan"
+    if ($globalLog) { WriteLog -fileName $logfile -message "TimeGrain defined is $timeSpan" }
+  }
+  else {
+    # Set a timeSpan by Default at 1 day
+    $timeSpan = New-TimeSpan -Days 1 -Hours 0 -Minutes 0 -Seconds 0
+    Write-Verbose "ERROR: the TimeGrain provides in parameter ($timeGrain) has a bad format."
+    Write-Verbose "ERROR: TimeSpan defined by default is 1 day."
+    if ($globalLog) { WriteLog -fileName $logfile -message "ERROR: the TimeGrain provides in parameter ($timeGrain) has a bad format." }
+    if ($globalLog) { WriteLog -fileName $logfile -message "ERROR: TimeSpan defined by default is 1 day." }
+  }
+  return $timeSpan
+} 
 
 function GetSubscriptions
 {
@@ -499,6 +539,9 @@ Write-Verbose "Starting processing..."
 # if variable checkIfLogIn in json file is set to "Y", Check if log in to Azure
 if ($globalVar.checkIfLogIn.ToUpper() -eq "Y") { CheckIfLogIn }
 
+# Define the TimeGrain
+$timeGrain = (GetTimeGrain -timeGrain $globalVar.metrics.timeGrain)
+
 # retrieve Subscriptions
 $subscriptions = (GetSubscriptions -scope $globalVar.subscriptionsScope)
 # --
@@ -528,11 +571,11 @@ if ($subscriptions.Count -ne 0) {
         $vmSizing = GetVmSizing -rgName $vm.ResourceGroupName -vmName $vm.Name -sku $vm.VmSize
         # -- Calculate CPU usage in percentage
         $avgPercentCpu = (
-          GetPercentCpuUsage -resourceId $vm.Id -metric $globalVar.metrics.cpuUsage -retentionDays $globalVar.metrics.retentionDays -timeGrain 01:00:00 -limitCpu $globalVar.limitCountCpu
+          GetPercentCpuUsage -resourceId $vm.Id -metric $globalVar.metrics.cpuUsage -retentionDays $globalVar.metrics.retentionDays -timeGrain $timeGrain -limitCpu $globalVar.limitCountCpu
         )
         # -- Calculate Memory usage in percentage
         $avgPercentMem = (
-          GetPercentMemUsage -ResourceId $vm.Id -metric $globalVar.metrics.memoryAvailable -retentionDays $globalVar.metrics.retentionDays -vmMemory $vmSizing.MemoryInMB -timeGrain 01:00:00 -limitMem $globalVar.limitCountMem
+          GetPercentMemUsage -ResourceId $vm.Id -metric $globalVar.metrics.memoryAvailable -retentionDays $globalVar.metrics.retentionDays -vmMemory $vmSizing.MemoryInMB -timeGrain $timeGrain -limitMem $globalVar.limitCountMem
         )
         # Aggregate informations
         $arrayVm += SetObjResult @(

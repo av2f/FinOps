@@ -1,0 +1,17 @@
+{
+  "pathResult": "C:/Users/fparment/Documents/AzFinOps/Data/GetAzAllTags/",
+  "fileResult": "GetAzAllTags",
+  "chronoFile": "Y",
+  "generateLogFile": "Y",
+  "checkIfLogIn": "Y",
+  "subscriptionsScope": {
+    "scope": "C:/Users/fparment/Documents/AzFinOps/Data/Alstom/dxc_subscriptions.csv",
+    "delimiter": ";"
+  },
+  "saveEvery": 100,
+  "finopsTags": {
+    "search": "Y",
+    "pattern": "\"env\",\"aip\",\"cod\",\"nam\",\"own\",\"cri\",\"cus\",\"dep\",\"sup\",\"sla\",\"ser\",\"win\"",
+    "tagsName": "\"Environment\",\"AIPCode\n,\"AIPName\",\"AIPOwner\",\"AIPCriticality\n,\"Customer\",\"DepartmentName\",\"Owner\",\"Supported\",\"SLA\",\"ServiceWindows\""
+  }
+}

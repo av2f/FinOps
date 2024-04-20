@@ -4,6 +4,8 @@ Functions for Azure:
 
 - CheckIfLogin: Checks if already login to Azure and if not the case, ask to log in
 
+- GetTimeGrain: Create the TimeSpan from the timegrain defined in string
+
 - GetSubscriptions : Retrieves subcriptions from a scope: All or a .csv file with subcription name and Id to process
 
 - GetVmInfoFromSubscription: Retrieve for VMs from the current subscription, retrieving following VMs informations:
@@ -92,6 +94,42 @@ function CheckIfLogIn
     if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Already connected to Azure") }
   }
 }
+# -----------------------------------------------------
+function GetTimeGrain
+{
+  <#
+    Create the TimeSpan from the timegrain defined in string
+    the format must be [days.]Hours:Minutes.Seconds (days is optional)
+    if the format provided in paramater is not good, by default result is 1.00:00:00 (1 day)
+    Input :
+      - $timeGrain: String with format [days.]Hours:Minutes.Seconds
+    Output :
+      - $timeSpan: TimeSpan created
+  #>
+
+  param(
+    [String]$timeGrain
+  )
+
+  if ( $timeGrain -match "([0-9])?(.)?([0-2][0-9]):([0-5][0-9]):([0-5][0-9])") {
+    # Format of $timeGrain is OK
+    # Build TimeGrain
+    if ($null -eq $matches[1]) { $days = 0 }
+    else { $days = $matches[1] }
+    $timeSpan = New-TimeSpan -Days $days -Hours $matches[3] -Minutes $matches[4] -Seconds $matches[5]
+    Write-Verbose "TimeGrain defined is $timeSpan"
+    if ($globalLog) { WriteLog -fileName $logfile -message "TimeGrain defined is $timeSpan" }
+  }
+  else {
+    # Set a timeSpan by Default at 1 day
+    $timeSpan = New-TimeSpan -Days 1 -Hours 0 -Minutes 0 -Seconds 0
+    Write-Verbose "ERROR: the TimeGrain provides in parameter ($timeGrain) has a bad format."
+    Write-Verbose "ERROR: TimeSpan defined by default is 1 day."
+    if ($globalLog) { WriteLog -fileName $logfile -message "ERROR: the TimeGrain provides in parameter ($timeGrain) has a bad format." }
+    if ($globalLog) { WriteLog -fileName $logfile -message "ERROR: TimeSpan defined by default is 1 day." }
+  }
+  return $timeSpan
+} 
 # -----------------------------------------------------
 function GetSubscriptions
 {
