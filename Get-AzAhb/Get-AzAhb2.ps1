@@ -1,12 +1,12 @@
 <#
   Name    : Get-AzAhb.ps1
   Author  : Frederic Parmentier
-  Version : 1.0
+  Version : 1.2
   Creation Date : 04/02/2024
   
-  Updated date  :
-  Updated by    :
-  Update done   :
+  Updated date  : 04/20/2024
+  Updated by    : Frederic Parmentier
+  Update done   : Add function GetTimeGrain to build the TimeSpan of TimeGrain
 
   Help to optimize Azure Hybrid Benefit (AHB) management
 
@@ -163,23 +163,41 @@ function CheckIfLogIn
   }
 }
 
-function ReplaceEmpty
+function GetTimeGrain
 {
   <#
-    Replace an empty string by string given in parameter
-    Input:
-      - $checkStr: String to check
-      - $replacedBy: String to set up if $checkStr is empty
-    Output: 
-      - $checkStr
+    Create the TimeSpan from the timegrain defined in string
+    the format must be [days.]Hours:Minutes.Seconds (days is optional)
+    if the format provided in paramater is not good, by default result is 1.00:00:00 (1 day)
+    Input :
+      - $timeGrain: String with format [days.]Hours:Minutes.Seconds
+    Output :
+      - $timeSpan: TimeSpan created
   #>
+
   param(
-    [String]$checkStr,
-    [String]$replacedBy
+    [String]$timeGrain
   )
-  if ($checkStr -match "^\s*$") { $checkStr = $replacedBy }
-  return $checkStr
-}
+
+  if ( $timeGrain -match "([0-9])?(.)?([0-2][0-9]):([0-5][0-9]):([0-5][0-9])") {
+    # Format of $timeGrain is OK
+    # Build TimeGrain
+    if ($null -eq $matches[1]) { $days = 0 }
+    else { $days = $matches[1] }
+    $timeSpan = New-TimeSpan -Days $days -Hours $matches[3] -Minutes $matches[4] -Seconds $matches[5]
+    Write-Verbose "TimeGrain defined is $timeSpan"
+    if ($globalLog) { WriteLog -fileName $logfile -message "TimeGrain defined is $timeSpan" }
+  }
+  else {
+    # Set a timeSpan by Default at 1 day
+    $timeSpan = New-TimeSpan -Days 1 -Hours 0 -Minutes 0 -Seconds 0
+    Write-Verbose "ERROR: the TimeGrain provides in parameter ($timeGrain) has a bad format."
+    Write-Verbose "ERROR: TimeSpan defined by default is 1 day."
+    if ($globalLog) { WriteLog -fileName $logfile -message "ERROR: the TimeGrain provides in parameter ($timeGrain) has a bad format." }
+    if ($globalLog) { WriteLog -fileName $logfile -message "ERROR: TimeSpan defined by default is 1 day." }
+  }
+  return $timeSpan
+} 
 
 function CalcCores
 {
@@ -304,6 +322,8 @@ function GetSubscriptions
   }
   return $listSubscriptions
 }
+
+
 
 function GetVmsFromRg
 {
@@ -564,6 +584,9 @@ Write-Verbose "Starting processing..."
 # if variable checkIfLogIn in json file is set to "Y", Check if log in to Azure
 if ($globalVar.checkIfLogIn.ToUpper() -eq "Y") { CheckIfLogIn }
 
+# Define the TimeGrain
+$timeGrain = (GetTimeGrain -timeGrain $globalVar.metrics.timeGrain)
+
 # retrieve Subscriptions
 $subscriptions = (GetSubscriptions -scope $globalVar.subscriptionsScope)
 # --
@@ -615,11 +638,11 @@ if ($subscriptions.Count -ne 0) {
               $resultCores = CalcCores -nbCores $vmSizing.NumberOfCores -coresByLicense $globalVar.weightLicenseInCores -licenseType $vmInfos[2] -powerState $vm.PowerState
               # -- Calculate CPU usage in percentage
               $avgPercentCpu = (
-                GetAvgCpuUsage -resourceId $vmInfos[0] -metric $globalVar.metrics.cpuUsage -retentionDays $globalVar.metrics.retentionDays -timeGrain 1.00:00:00
+                GetAvgCpuUsage -resourceId $vmInfos[0] -metric $globalVar.metrics.cpuUsage -retentionDays $globalVar.metrics.retentionDays -timeGrain $timeGrain
               )
               # -- Calculate Memory usage in percentage
               $avgPercentMem = (
-                GetAvgMemUsage -ResourceId $vmInfos[0] -metric $globalVar.metrics.memoryAvailable -retentionDays $globalVar.metrics.retentionDays -vmMemory $vmSizing.MemoryInMB -timeGrain 1.00:00:00
+                GetAvgMemUsage -ResourceId $vmInfos[0] -metric $globalVar.metrics.memoryAvailable -retentionDays $globalVar.metrics.retentionDays -vmMemory $vmSizing.MemoryInMB -timeGrain $timeGrain
               )
               # Aggregate informations
               $arrayVm += SetObjResult @(

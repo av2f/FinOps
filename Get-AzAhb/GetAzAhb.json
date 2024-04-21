@@ -21,7 +21,8 @@
   "metrics": {
     "cpuUsage": "Percentage CPU",
     "memoryAvailable": "Available Memory Bytes",
-    "retentionDays": 30
+    "retentionDays": 30,
+    "timeGrain": "1.00:00:00"
   },
   "tags": {
     "environment": "Environment",
