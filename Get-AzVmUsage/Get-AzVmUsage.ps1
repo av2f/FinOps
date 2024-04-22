@@ -264,7 +264,7 @@ function GetVmInfoFromSubscription
     Retrieve for VMs from the current subscription, retrieving following VMs informations:
     ResourceGroupName, VM Name, VM Id, VmId, Location, PowerState, OsType, OsName, LicenseType, VM Size
     Input:
-      - None
+      - $subscriptionId: Subscription ID
     Output:
       - $listVms: array of results
   #>
@@ -277,8 +277,8 @@ function GetVmInfoFromSubscription
 
   # Retrieve VMs from $subscriptionId with informations
   try {
-    $listVms = (Get-AzVm -Status) | Select-Object -Property ResourceGroupName, Name, Id, VmId, Location, PowerState, OsName, LicenseType,
-    @{l="OsType";e={$_.StorageProfile.OSDisk.OsType}}, @{l="VmSize";e={$_.HardwareProfile.VmSize}} -ErrorAction SilentlyContinue
+    $listVms = (Get-AzVm -Status | Select-Object -Property ResourceGroupName, Name, Id, VmId, Location, PowerState, OsName, LicenseType,
+    @{l="OsType";e={$_.StorageProfile.OSDisk.OsType}}, @{l="VmSize";e={$_.HardwareProfile.VmSize}} -ErrorAction SilentlyContinue)
   }
   catch {
     Write-Host "An error occured retrieving VMs from Subscription Id $subscriptionId"
@@ -487,7 +487,7 @@ function SetObjResult {
   $objTagResult = @(
     [PSCustomObject]@{
       Subscription = $listResult[0]
-      ResourceGroupName = $listResult[1]
+      ResourceGroup = $listResult[1]
       Vm_Name = $listResult[2]
       Id = $listResult[3]
       Resource_Id = $listResult[4]
@@ -559,7 +559,7 @@ if ($subscriptions.Count -ne 0) {
       $vmTotal = 0
       foreach ($vm in $vms) {
         # -- Retrieve VM sizing
-        $vmSizing = GetVmSizing -rgName $vm.ResourceGroupName -vmName $vm.Name -sku $vm.VmSize
+        $vmSizing = (GetVmSizing -rgName $vm.ResourceGroupName -vmName $vm.Name -sku $vm.VmSize)
         # -- Calculate CPU usage in percentage
         $avgPercentCpu = (
           GetPercentCpuUsage -resourceId $vm.Id -metric $globalVar.metrics.cpuUsage -retentionDays $globalVar.metrics.retentionDays -timeGrain $timeGrain -limitCpu $globalVar.limitCountCpu

@@ -203,7 +203,7 @@ function GetVmInfoFromSubscription
     Retrieve for VMs from the current subscription, retrieving following VMs informations:
     ResourceGroupName, VM Name, VM Id, VmId, Location, PowerState, OsType, OsName, LicenseType, VM Size
     Input:
-      - None
+      - $subscriptionId: Subscription ID
     Output:
       - $listVms: array of results
   #>
@@ -216,8 +216,8 @@ function GetVmInfoFromSubscription
 
   # Retrieve VMs from $subscriptionId with informations
   try {
-    $listVms = (Get-AzVm -Status) | Select-Object -Property ResourceGroupName, Name, Id, VmId, Location, PowerState, OsName, LicenseType,
-    @{l="OsType";e={$_.StorageProfile.OSDisk.OsType}}, @{l="VmSize";e={$_.HardwareProfile.VmSize}}
+    $listVms = (Get-AzVm -Status | Select-Object -Property ResourceGroupName, Name, Id, VmId, Location, PowerState, OsName, LicenseType,
+    @{l="OsType";e={$_.StorageProfile.OSDisk.OsType}}, @{l="VmSize";e={$_.HardwareProfile.VmSize}} -ErrorAction SilentlyContinue)
   }
   catch {
     Write-Host "An error occured retrieving VMs from Subscription Id $subscriptionId"
@@ -233,7 +233,6 @@ function GetVmsFromRg
   <#
     Retrieve for VMs from Resource group $rgName retrieving following VMs informations:
     Name, Location, OsName, PowerState
-    filter by OsType = Windows
     Input:
       - $rgName: Resource Group Name
     Output:
@@ -391,11 +390,20 @@ function GetAvgCpuUsage
   $avgCpus = (Get-AzMetric -ResourceId $resourceId -MetricName $metric -StartTime $startTime -EndTime $endTime -AggregationType Average -TimeGrain $timeGrain |
     ForEach-Object { $_.Data.Average })
   
+  if ($avgCpus.count -gt 0) {
     # Calculate Average of CPU usage in percentage
-  foreach ($avgCpu in $avgCpus) {
-    $resAvgCpuUsage += $avgCpu
+    foreach ($avgCpu in $avgCpus) {
+      $resAvgCpuUsage += $avgCpu
+    }
+    $resAvgCpuUsage = [Math]::Round($resAvgCpuUsage/$avgCpus.count,2)
   }
-  return [Math]::Round($resAvgCpuUsage/$avgCpus.count,2)
+  else {
+    if ($globalLog) { (WriteLog -fileName $logfile -message "ERROR: Unable to retrieve average CPU usage for $resourceId") }
+    Write-Verbose "--- ERROR: Unable to retrieve average CPU usage for $resourceId"
+    $globalError += 1
+    $resAvgCpuUsage = -1
+  }
+  return $resAvgCpuUsage
 }
 # ----------------------------------------------------------
 function GetAvgMemUsage
@@ -438,19 +446,27 @@ function GetAvgMemUsage
     $avgAvailableMems = (Get-AzMetric -ResourceId $resourceId -MetricName $metric -StartTime $startTime -EndTime $endTime -AggregationType Average -TimeGrain $timeGrain |
       ForEach-Object { $_.Data.Average })
     
-      # Calculate Average of Memory usage in percentage
-    foreach ($avgAvailableMem in $avgAvailableMems) {
-      # if value is null, $avgAvailableMem = $vmMemory in Bytes
-      if ($null -eq $avgAvailableMem) {
-        $avgAvailableMem = $vmMemory * 1024 * 1024
+    if ($avgAvailableMems.count -gt 0) {
+    # Calculate Average of Memory usage in percentage
+      foreach ($avgAvailableMem in $avgAvailableMems) {
+        # if value is null, $avgAvailableMem = $vmMemory in Bytes
+        if ($null -eq $avgAvailableMem) {
+          $avgAvailableMem = $vmMemory * 1024 * 1024
+        }
+        $resAvgMemUsage += (($vmMemory - ($avgAvailableMem/(1024*1024))) * 100) / $vmMemory
       }
-      $resAvgMemUsage += (($vmMemory - ($avgAvailableMem/(1024*1024))) * 100) / $vmMemory
+      # Calculate Average
+      $resAvgMemUsage = [Math]::Round($resAvgMemUsage/$avgAvailableMems.count,2)
     }
-    # Calculate Average
-    $resAvgMemUsage = [Math]::Round($resAvgMemUsage/$avgAvailableMems.count,2)
+    else {
+      if ($globalLog) { (WriteLog -fileName $logfile -message "ERROR: Unable to retrieve average Memory usage for $resourceId") }
+      Write-Verbose "--- ERROR: Unable to retrieve average Memory usage for $resourceId"
+      $globalError += 1
+      $resAvgMemUsage = -1
+    }
   }
   # else $resAvgMemUsage = 0
-  else { $resAvgMemUsage = 0 }
+  else { $resAvgMemUsage = -1 }
   
   return $resAvgMemUsage
 }

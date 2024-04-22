@@ -1,5 +1,5 @@
 Name    : Get-AzAhb.ps1
-Version : 1.1
+Version : 1.2
 
 ** Description **
 Help to optimize Azure Hybrid Benefit (AHB) management
@@ -44,3 +44,9 @@ Updated date  : 04-17-2024
 Updated by    : Frederic Parmentier
 Update done   :
  - Add function GetTimeGrain to build the TimeSpan of TimeGrain
+
+Updated date  : 04-22-2024
+Updated by    : Frederic Parmentier
+Update done   :
+ - Improve time to retrieve of VMs informations
+ - fix bug for AvgCpuUsage and AvgMemUsage calculation to avoid division by zero
