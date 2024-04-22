@@ -1,13 +1,9 @@
 <#
   Name    : Get-AzAhb.ps1
   Author  : Frederic Parmentier
-  Version : 1.2
+  Version : 1.1
   Creation Date : 04/02/2024
-  
-  Updated date  : 04/20/2024
-  Updated by    : Frederic Parmentier
-  Update done   : Add function GetTimeGrain to build the TimeSpan of TimeGrain
-
+ 
   Help to optimize Azure Hybrid Benefit (AHB) management
 
   Build a .csv file that contains for each Windows VMs:

@@ -1,12 +1,8 @@
 <#
   Name    : Get-AzOwnerSubscriptions.ps1
   Author  : Frederic Parmentier
-  Version : 1.0
+  Version : 1.1
   Creation Date : 01/26/2024
-  
-  Updated date  : 04/07/2024
-  Updated by    : Frederic Parmentier
-  Update done   : Re-adapt script with new standards defined
 
   Retrieve Subscription owners from Access Control(IAM) and a Tag if defined and store them in 
   GetAzOwnerSubscriptions[mmddyyyyhhmmss].csv

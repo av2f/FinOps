@@ -3,16 +3,11 @@
   Author  : Frederic Parmentier
   Version : 1.1
   Creation Date : 02/01/2024
-  
-  Updated date  : 04/05/2024
-  Updated by    : F. Parmentier
-  Update done   : 
-    - Re-design script by functions
-    - Add Json parameter file
 
   Retrieve Tags defined in Subscriptions, Resource Groups and Resources, and store them in 
   .\GetAzAllTags\GetAzAllTags[mmddyyyyhhmmss].csv
   For more information, type Get-Help .\Get-AzAllTags.ps1 [-detailed | -full]
+  Global variables are stored in .\GetAzAllTags.json and must be adapted accordingly
 #>
 
 <# -----------

@@ -1,18 +1,9 @@
 <#
   Name    : Get-AzVmUsage.ps1
   Author  : Frederic Parmentier
-  Version : 1.5.1
+  Version : 1.1.1
   Creation Date : 04/10/2024
-  
-  Updated date  : 04/17/2024
-  Updated by    : Frederic Parmentier
-  Update done   : Improve function to retrieve VMs informations
-                  Perform a sanity check of list of subscriptions in .csv file removing deleted and disabled
-
-  Updated date  : 04/20/2024
-  Updated by    : Frederic Parmentier
-  Update done   : Add function GetTimeGrain to build the TimeSpan of TimeGrain
-                 
+                   
   Retrieve CPU and RAM usage for all VMs in subscriptions scope defined
 
   Build a .csv file that contains for each Windows VMs:

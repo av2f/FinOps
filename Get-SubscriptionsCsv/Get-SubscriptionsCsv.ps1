@@ -3,11 +3,7 @@
   Author  : Frederic Parmentier
   Version : 1.0
   Creation Date : 04/07/2024
-  
-  Updated date  :
-  Updated by    :
-  Update done   : 
-  
+   
   Transform a .csv file of subscriptions downloaded from Cost Management/Cost analysis with parameters:
     - Group by: Subscriptions
     - Granularity: None
