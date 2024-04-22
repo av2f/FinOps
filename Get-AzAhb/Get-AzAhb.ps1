@@ -497,7 +497,7 @@ function GetAvgMemUsage
     }
   }
   # else $resAvgMemUsage = 0
-  else { $resAvgMemUsage = -1 }
+  else { $resAvgMemUsage = 0 }
   
   return $resAvgMemUsage
 }
