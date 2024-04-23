@@ -8,6 +8,10 @@ Functions for Azure:
 
 - GetSubscriptions : Retrieves subcriptions from a scope: All or a .csv file with subcription name and Id to process
 
+- GetVmInfoOsFilterFromSubscription: Retrieve for VMs from the current subscription, retrieving following VMs informations:
+  + ResourceGroupName, VM Name, VM Id, VmId, Location, PowerState, OsType, OsName, LicenseType, VM Size
+  + Tags Environment and Tags Availability defined in the Json file parameter
+
 - GetVmInfoFromSubscription: Retrieve for VMs from the current subscription, retrieving following VMs informations:
   - ResourceGroupName, VM Name, VM Id, VmId, Location, PowerState, OsType, OsName, LicenseType, VM Size
 
@@ -197,6 +201,45 @@ function GetSubscriptions
   return $listSubscriptions
 }
 # -----------------------------------------------------
+function GetVmInfoOsFilterFromSubscription
+{
+  <#
+    Retrieve for VMs from the current subscription, retrieving following VMs informations:
+     + ResourceGroupName, VM Name, VM Id, VmId, Location, PowerState, OsType, OsName, LicenseType, VM Size
+     + Tags Environment and Tags Availability defined in the Json file parameter
+    Input:
+      - $subscriptionId: Subscription ID
+      - $osFilter: OS to be filtered
+    Output:
+      - $errorCount: Nb of errors detected
+      - $listVms: array of results
+  #>
+
+  param(
+    [String]$subscriptionId,
+    [String]$osFilter
+  )
+  
+  $listVms = @()
+  $errorCount = 0
+
+  # Retrieve VMs from $subscriptionId with informations
+  try {
+    $listVms = (Get-AzVm -Status |
+    Where-Object {$_.StorageProfile.OSDisk.OsType -eq $($osFilter)} |
+    Select-Object -Property ResourceGroupName, Name, Id, VmId, Location, PowerState, OsName, LicenseType,
+    @{l="OsType";e={$_.StorageProfile.OSDisk.OsType}}, @{l="VmSize";e={$_.HardwareProfile.VmSize}},
+    @{l="TagEnvironment";e={$_.Tags.$($globalVar.tags.environment)}}, @{l="TagAvailability";e={$_.Tags.$($globalVar.tags.availability)}} -ErrorAction SilentlyContinue)
+  }
+  catch {
+    Write-Host "An error occured retrieving VMs from Subscription Id $subscriptionId"
+    if ($globalLog) { (WriteLog -fileName $logfile -message "ERROR: An error occured retrieving VMs from Subscription Id $subscriptionId") }
+    $listVms = @('Error', 'Error', 'Error', 'Error','Error', 'Error', 'Error', 'Error','Error', 'Error','Error', 'Error')
+    $errorCount += 1
+  }
+  return $errorCount,$listVms
+}
+# -----------------------------------------------------
 function GetVmInfoFromSubscription
 {
   <#
@@ -307,6 +350,7 @@ function GetVmSizing
       - $vmName: Virtual Machine Name
       - $sku: SKU of Virtual Machine
     Output:
+      - $errorCount: Nb of errors detected
       - $resSizing: array of results
   #>
   param(
@@ -315,6 +359,8 @@ function GetVmSizing
     [String]$sku
   )
   $resSizing = @()
+  $errorCount = 0
+  
   try {
     $resSizing = (Get-AzVMSize -ResourceGroupName $rgName -VMName $vmName |
       Where-Object { $_.Name -eq $($sku) } |
@@ -324,10 +370,10 @@ function GetVmSizing
   catch {
     Write-Host "An error occured retrieving VM informations for $vmName"
     if ($globalLog) { (WriteLog -fileName $logfile -message "ERROR: An error occured retrieving VM informations for $vmName") }
-    $resSizing = @('Error', 'Error')
-    $globalError += 1
+    $resSizing = @('-1', '-1')
+    $errorCount += 1
   }
-  return $resSizing
+  return $errorCount,$resSizing
 }
 # ----------------------------------------------------------
 function Get-RoleOwnerSubscription
@@ -368,6 +414,7 @@ function GetAvgCpuUsage
       - $retentionDays: Number of days to calculate the average. Limit max = 30 days
       - $timeGrain: Granularity of time
     Output:
+      - $errorCount: Nb of errors detected
       - $resAvgCpuUsage: Average in percentage of CPU usage during the last $retentionDays
   #>
   param(
@@ -384,6 +431,8 @@ function GetAvgCpuUsage
   if ($retentionDays -gt 30) {
     $retentionDays = 7
   }
+
+  $errorCount = 0
   
   $resAvgCpuUsage = 0
   # Retrieve Average CPU usage in percentage
@@ -400,10 +449,10 @@ function GetAvgCpuUsage
   else {
     if ($globalLog) { (WriteLog -fileName $logfile -message "ERROR: Unable to retrieve average CPU usage for $resourceId") }
     Write-Verbose "--- ERROR: Unable to retrieve average CPU usage for $resourceId"
-    $globalError += 1
+    $errorCount += 1
     $resAvgCpuUsage = -1
   }
-  return $resAvgCpuUsage
+  return $errorCount,$resAvgCpuUsage
 }
 # ----------------------------------------------------------
 function GetAvgMemUsage
@@ -419,6 +468,7 @@ function GetAvgMemUsage
       - $timeGrain: Granularity of time
 
     Output:
+      - $errorCount: Nb of errors detected
       - $resAvgMemUsage: Average in MB of RAM usage during the last $retentionDays
   #>
   param(
@@ -442,6 +492,8 @@ function GetAvgMemUsage
       $retentionDays = 7
     }
 
+    $errorCount = 0
+
     # Retrieve Average of available RAM in Bytes
     $avgAvailableMems = (Get-AzMetric -ResourceId $resourceId -MetricName $metric -StartTime $startTime -EndTime $endTime -AggregationType Average -TimeGrain $timeGrain |
       ForEach-Object { $_.Data.Average })
@@ -461,14 +513,14 @@ function GetAvgMemUsage
     else {
       if ($globalLog) { (WriteLog -fileName $logfile -message "ERROR: Unable to retrieve average Memory usage for $resourceId") }
       Write-Verbose "--- ERROR: Unable to retrieve average Memory usage for $resourceId"
-      $globalError += 1
+      $errorCount += 1
       $resAvgMemUsage = -1
     }
   }
   # else $resAvgMemUsage = 0
-  else { $resAvgMemUsage = -1 }
+  else { $resAvgMemUsage = 0 }
   
-  return $resAvgMemUsage
+  return $errorCount,$resAvgMemUsage
 }
 # ----------------------------------------------------------
 function GetPercentCpuUsage

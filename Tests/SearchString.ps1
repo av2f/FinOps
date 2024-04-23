@@ -49,12 +49,16 @@ Set-AzContext -Subscription "c5ea61f3-1975-4b59-9e9c-66128b8989f3"
 $resourceGroupName = "sdc7-05207-prod-rg"
 $resource = (Get-AzResource -ResourceGroupName $resourceGroupName | Where-Object Name -eq 'srsdc705207l001' | Select-Object -Property Name, ResourceType, Location, ResourceId, Tags)
 
-$pattern = $globalVar.finopsTags.pattern.split(",")
-Write-Host $pattern.count
+$patterns = $globalVar.finopsTags.patterns.split(",")
+Write-Host $patterns.count
 
 if ($resource.Tags.Count -ne 0) {
   foreach ($key in $resource.Tags.keys) {
-    if ($pattern -match $key) {}
+    foreach ($pattern in $patterns) {
+      if ($key -match $pattern) {
+        Write-Host "$key Match with $pattern"
+      }
+    }
   }
 }
 <#

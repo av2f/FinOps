@@ -266,6 +266,7 @@ function GetVmInfoFromSubscription
     Input:
       - $subscriptionId: Subscription ID
     Output:
+      - $errorCount: Nb of errors detected
       - $listVms: array of results
   #>
 
@@ -274,6 +275,7 @@ function GetVmInfoFromSubscription
   )
   
   $listVms = @()
+  $errorCount = 0
 
   # Retrieve VMs from $subscriptionId with informations
   try {
@@ -284,9 +286,9 @@ function GetVmInfoFromSubscription
     Write-Host "An error occured retrieving VMs from Subscription Id $subscriptionId"
     if ($globalLog) { (WriteLog -fileName $logfile -message "ERROR: An error occured retrieving VMs from Subscription Id $subscriptionId") }
     $listVms = @('Error', 'Error', 'Error', 'Error','Error', 'Error', 'Error', 'Error','Error', 'Error')
-    $globalError += 1
+    $errorCount += 1
   }
-  return $listVms
+  return $errorCount,$listVms
 }
 
 function GetVmSizing
@@ -306,6 +308,8 @@ function GetVmSizing
     [String]$sku
   )
   $resSizing = @()
+  $errorCount = 0
+
   try {
     $resSizing = (Get-AzVMSize -ResourceGroupName $rgName -VMName $vmName |
       Where-Object { $_.Name -eq $($sku) } |
@@ -316,9 +320,9 @@ function GetVmSizing
     Write-Host "An error occured retrieving VM informations for $vmName"
     if ($globalLog) { (WriteLog -fileName $logfile -message "ERROR: An error occured retrieving VM informations for $vmName") }
     $resSizing = @('Error', 'Error')
-    $globalError += 1
+    $errorCount += 1
   }
-  return $resSizing
+  return $errorCount,$resSizing
 }
 
 function GetPercentCpuUsage
@@ -551,15 +555,16 @@ if ($subscriptions.Count -ne 0) {
     Write-Verbose "-- Processing of Vms from Subscription $($subscription.Name)"
     $countVm = 0
     $arrayVm = @()
-    $vms = GetVmInfoFromSubscription -subscriptionId $subscription.Id
-
+    $errorCount, $vms = (GetVmInfoFromSubscription -subscriptionId $subscription.Id)
+    $globalError += $errorCount
     # Continue if there are Virtual Machines
     # as there is a bug with .Count when only 1 VM, replace by "$vms | Measure-Object | ForEach-Object count"
     if ($($vms | Measure-Object | ForEach-Object count) -gt 0) {
       $vmTotal = 0
       foreach ($vm in $vms) {
         # -- Retrieve VM sizing
-        $vmSizing = (GetVmSizing -rgName $vm.ResourceGroupName -vmName $vm.Name -sku $vm.VmSize)
+        $errorCount, $vmSizing = (GetVmSizing -rgName $vm.ResourceGroupName -vmName $vm.Name -sku $vm.VmSize)
+        $globalError += $errorCount
         # -- Calculate CPU usage in percentage
         $avgPercentCpu = (
           GetPercentCpuUsage -resourceId $vm.Id -metric $globalVar.metrics.cpuUsage -retentionDays $globalVar.metrics.retentionDays -timeGrain $timeGrain -limitCpu $globalVar.limitCountCpu

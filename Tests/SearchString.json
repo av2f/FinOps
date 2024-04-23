@@ -11,7 +11,7 @@
   "saveEvery": 100,
   "finopsTags": {
     "search": "Y",
-    "pattern": "\"env\",\"aip\",\"cod\",\"nam\",\"own\",\"cri\",\"cus\",\"dep\",\"sup\",\"sla\",\"ser\",\"win\"",
-    "tagsName": "\"Environment\",\"AIPCode\n,\"AIPName\",\"AIPOwner\",\"AIPCriticality\n,\"Customer\",\"DepartmentName\",\"Owner\",\"Supported\",\"SLA\",\"ServiceWindows\""
+    "patterns": "env,aip,cod,nam,own,cri,cus,dep,sup,sla,ser,win",
+    "tagsName": "environment,aipcode,aipname,aipowner,aipcriticality,customer,departmentname,owner,supported,sla,servicewindows"
   }
 }

@@ -26,7 +26,6 @@ Set-Item -Path Env:\SuppressAzurePowerShellBreakingChangeWarnings -Value $true
 # Retrieve global variables from json file
 $globalVar = Get-Content -Raw -Path ".\GetAzAllTags.json" | ConvertFrom-Json
 #
-$globalError = 0  # to count errors
 $globalChronoFile = (Get-Date -Format "MMddyyyyHHmmss") # Format for file with chrono
 $globalLog = $false # set to $true if generateLogFile in json file is set to "Y"
 
@@ -455,7 +454,7 @@ if ($subscriptions.Count -ne 0) {
   if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: File $csvResFile is available.") }
   Write-Verbose "File $csvResFile is available."
   if ($globalLog) {
-    (WriteLog -fileName $logfile -message "INFO: End processing with $globalError error(s)...") 
+    (WriteLog -fileName $logfile -message "INFO: End processing...") 
   }
 }
 else {
@@ -463,7 +462,7 @@ else {
   Write-Verbose "No Subscriptions enabled found."
 }
 if ($globalLog) {
-  (WriteLog -fileName $logfile -message "INFO: End processing with $globalError error(s)...") 
+  (WriteLog -fileName $logfile -message "INFO: End processing...") 
 }
 
 <# -----------

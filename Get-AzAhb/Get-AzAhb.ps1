@@ -328,6 +328,7 @@ function GetVmInfoOsFilterFromSubscription
       - $subscriptionId: Subscription ID
       - $osFilter: OS to be filtered
     Output:
+      - $errorCount: Nb of errors detected
       - $listVms: array of results
   #>
 
@@ -337,6 +338,7 @@ function GetVmInfoOsFilterFromSubscription
   )
   
   $listVms = @()
+  $errorCount = 0
 
   # Retrieve VMs from $subscriptionId with informations
   try {
@@ -350,9 +352,9 @@ function GetVmInfoOsFilterFromSubscription
     Write-Host "An error occured retrieving VMs from Subscription Id $subscriptionId"
     if ($globalLog) { (WriteLog -fileName $logfile -message "ERROR: An error occured retrieving VMs from Subscription Id $subscriptionId") }
     $listVms = @('Error', 'Error', 'Error', 'Error','Error', 'Error', 'Error', 'Error','Error', 'Error','Error', 'Error')
-    $globalError += 1
+    $errorCount += 1
   }
-  return $listVms
+  return $errorCount, $listVms
 }
 
 function GetVmSizing
@@ -364,6 +366,7 @@ function GetVmSizing
       - $vmName: Virtual Machine Name
       - $sku: SKU of Virtual Machine
     Output:
+      - $errorCount: Nb of errors detected
       - $resSizing: array of results
   #>
   param(
@@ -372,6 +375,7 @@ function GetVmSizing
     [String]$sku
   )
   $resSizing = @()
+  $errorCount = 0
   
   try {
     $resSizing = (Get-AzVMSize -ResourceGroupName $rgName -VMName $vmName |
@@ -383,9 +387,9 @@ function GetVmSizing
     Write-Host "An error occured retrieving VM informations for $vmName"
     if ($globalLog) { (WriteLog -fileName $logfile -message "ERROR: An error occured retrieving VM informations for $vmName") }
     $resSizing = @('-1', '-1')
-    $globalError += 1
+    $errorCount += 1
   }
-  return $resSizing
+  return $errorCount,$resSizing
 }
 
 function GetAvgCpuUsage
@@ -399,6 +403,7 @@ function GetAvgCpuUsage
       - $retentionDays: Number of days to calculate the average. Limit max = 30 days
       - $timeGrain: Granularity of time
     Output:
+      - $errorCount: Nb of errors detected
       - $resAvgCpuUsage: Average in percentage of CPU usage during the last $retentionDays
   #>
   param(
@@ -415,6 +420,8 @@ function GetAvgCpuUsage
   if ($retentionDays -gt 30) {
     $retentionDays = 7
   }
+
+  $errorCount = 0
   
   $resAvgCpuUsage = 0
   # Retrieve Average CPU usage in percentage
@@ -431,10 +438,10 @@ function GetAvgCpuUsage
   else {
     if ($globalLog) { (WriteLog -fileName $logfile -message "ERROR: Unable to retrieve average CPU usage for $resourceId") }
     Write-Verbose "--- ERROR: Unable to retrieve average CPU usage for $resourceId"
-    $globalError += 1
+    $errorCount += 1
     $resAvgCpuUsage = -1
   }
-  return $resAvgCpuUsage
+  return $errorCount,$resAvgCpuUsage
 }
 
 function GetAvgMemUsage
@@ -450,6 +457,7 @@ function GetAvgMemUsage
       - $timeGrain: Granularity of time
 
     Output:
+      - $errorCount: Nb of errors detected
       - $resAvgMemUsage: Average in MB of RAM usage during the last $retentionDays
   #>
   param(
@@ -473,6 +481,8 @@ function GetAvgMemUsage
       $retentionDays = 7
     }
 
+    $errorCount = 0
+
     # Retrieve Average of available RAM in Bytes
     $avgAvailableMems = (Get-AzMetric -ResourceId $resourceId -MetricName $metric -StartTime $startTime -EndTime $endTime -AggregationType Average -TimeGrain $timeGrain |
       ForEach-Object { $_.Data.Average })
@@ -492,14 +502,14 @@ function GetAvgMemUsage
     else {
       if ($globalLog) { (WriteLog -fileName $logfile -message "ERROR: Unable to retrieve average Memory usage for $resourceId") }
       Write-Verbose "--- ERROR: Unable to retrieve average Memory usage for $resourceId"
-      $globalError += 1
+      $errorCount += 1
       $resAvgMemUsage = -1
     }
   }
   # else $resAvgMemUsage = 0
   else { $resAvgMemUsage = 0 }
   
-  return $resAvgMemUsage
+  return $errorCount,$resAvgMemUsage
 }
 
 function SetObjResult {
@@ -584,7 +594,8 @@ if ($subscriptions.Count -ne 0) {
     Write-Verbose "-- Processing of Vms from Subscription $($subscription.Name)"
     $countVm = 0
     $arrayVm = @()
-    $vms = (GetVmInfoOsFilterFromSubscription -subscriptionId $subscription.Id -osFilter $globalVar.osTypeFilter)
+    $errorCount, $vms = (GetVmInfoOsFilterFromSubscription -subscriptionId $subscription.Id -osFilter $globalVar.osTypeFilter)
+    $globalError += $errorCount
     
     # Continue if there are Virtual Machines
     # as there is a bug with .Count when only 1 VM, replace by "$vms | Measure-Object | ForEach-Object count"
@@ -592,19 +603,22 @@ if ($subscriptions.Count -ne 0) {
       $vmTotalSubscription = 0  # Count number of Windows VM in the RG
       foreach ($vm in $vms) {
         # -- Retrieve VM sizing
-        $vmSizing = (GetVmSizing -rgName $vm.ResourceGroupName -vmName $vm.Name -sku $vm.VmSize)
+        $errorCount, $vmSizing = (GetVmSizing -rgName $vm.ResourceGroupName -vmName $vm.Name -sku $vm.VmSize)
+        $globalError += $errorCount
         # -- Calculate Cores and Licenses for Hybrid Benefits
         $resultCores = (
           CalcCores -nbCores $vmSizing.NumberOfCores -coresByLicense $globalVar.weightLicenseInCores -licenseType $vm.LicenseType -powerState $vm.PowerState
         )
         # -- Calculate CPU usage in percentage
-        $avgPercentCpu = (
+        $errorCount, $avgPercentCpu = (
           GetAvgCpuUsage -resourceId $vm.Id -metric $globalVar.metrics.cpuUsage -retentionDays $globalVar.metrics.retentionDays -timeGrain $timeGrain
         )
+        $globalError += $errorCount
         # -- Calculate Memory usage in percentage
-        $avgPercentMem = (
+        $errorCount, $avgPercentMem = (
           GetAvgMemUsage -ResourceId $vm.Id -metric $globalVar.metrics.memoryAvailable -retentionDays $globalVar.metrics.retentionDays -vmMemory $vmSizing.MemoryInMB -timeGrain $timeGrain
         )
+        $globalError += $errorCount
         # Aggregate informations
         $arrayVm += SetObjResult @(
           $subscription.Name, $subscription.Id, $resourceGroupName.ResourceGroupName,
