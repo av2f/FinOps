@@ -19,8 +19,8 @@
   Example: .\Get-SubscriptionsCsv.ps1
 #>
 
-$pathFileSource = "D:\azFinOps\Data\Alstom\cost-analysis.csv"
-$pathFileTarget = "D:\azFinOps\Data\Alstom\subscriptions.csv"
+$pathFileSource = "C:\Users\fparment\Documents\AzFinOps\Data\Alstom\cost-analysis.csv"
+$pathFileTarget = "C:\Users\fparment\Documents\AzFinOps\Data\Alstom\subscriptions.csv"
 
 $listSubscriptions = Import-Csv -Path $pathFileSource -Delimiter "," | Select-Object SubscriptionName
 Write-Host "Start Processing for $($listSubscriptions.Count) subscriptions"

@@ -7,7 +7,7 @@
   "chronoFile": "Y",
   "checkIfLogIn": "Y",
   "subscriptionsScope": {
-    "scope": "D:/azFinOps/Data/Alstom/subscriptions.csv",
+    "scope": "C:/Users/fparment/Documents/AzFinOps/Data/Alstom/subscriptions.csv",
     "delimiter": ";"
   },
   "saveEvery": 100

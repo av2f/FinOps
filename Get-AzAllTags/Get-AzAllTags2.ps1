@@ -118,12 +118,12 @@ function CreateExcelFile
   #>
   param(
     [string]$excelFileName,
-    [Object[]]$csvFiles,
-    [Boolean]$removeCsvFile
+    [hashtable]$csvFiles,
+    [boolean]$removeCsvFile
   )
   
   # Create Excel File and Remove csv files if $removeCsvFile is set to True
-  foreach($key in $csvFiles) {
+  foreach($key in $csvFiles.Keys) {
     Import-Csv -Path $csvFiles[$key] | Export-Excel -Path $excelFileName -WorkSheetName $key
     if ($removeCsvFile) {
       if (Test-Path -Path $csvFiles[$key] -PathType Leaf)
@@ -543,7 +543,7 @@ if ($subscriptions.Count -ne 0) {
   $csvFileToExcel = @{}
   $csvFileToExcel.Add("AzTags", $csvFileTags)
   $csvFileToExcel.Add("AzNoTags", $csvFileNoTags)
-  CreateExcelFile -excelFileName $xlsResFile -csvFiles $csvFileToExcel -removeCsvFile $true
+  CreateExcelFile -excelFileName $xlsResFile -csvFiles $csvFileToExcel -removeCsvFile $false
 
   if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: File $xlsResFile is available.") }
   Write-Verbose "File $xlsResFile is available."
