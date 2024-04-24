@@ -1,11 +1,11 @@
 {
-  "pathResult": "C:/Users/fparment/Documents/AzFinOps/Data/GetAzAllTags/",
+  "pathResult": "D:/azFinOps/Data/GetAzAllTags/",
   "fileResult": "GetAzAllTags",
   "chronoFile": "Y",
   "generateLogFile": "Y",
   "checkIfLogIn": "Y",
   "subscriptionsScope": {
-    "scope": "C:/Users/fparment/Documents/AzFinOps/Data/Alstom/dxc_subscriptions.csv",
+    "scope": "D:/azFinOps/Data/Alstom/subscriptions.csv",
     "delimiter": ";"
   },
   "saveEvery": 100
