@@ -45,9 +45,11 @@ function CreateExcelFile
     [hashtable]$csvFiles,
     [Boolean]$removeCsvFile
   )
+
+  Write-Host $($csvFiles.Count)
   
   # Create Excel File and Remove csv files if $removeCsvFile is set to True
-  foreach($key in $csvFiles) {
+  foreach($key in $csvFiles.Keys) {
     Write-Host $csvFiles[$key] " - " $key
   }
 }
@@ -56,4 +58,6 @@ $csvFileToExcel = @{}
 $csvFileToExcel.Add("AzTags", "C:/Users/fparment/Documents/AzFinOps/Data/GetAzAllTags/GetAzTags")
 $csvFileToExcel.Add("AzNoTags", "C:/Users/fparment/Documents/AzFinOps/Data/GetAzAllTags/GetAzNoTags")
 
-CreateExcelFile -excelFileName $xlsResFile -csvFiles $csvFileToExcel -removeCsvFile $true
+Write-Host $($csvFileToExcel.Count)
+
+CreateExcelFile -excelFileName $xlsResFile -csvFiles $($csvFileToExcel) -removeCsvFile $true
