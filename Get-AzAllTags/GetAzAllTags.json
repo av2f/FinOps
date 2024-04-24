@@ -1,11 +1,23 @@
 {
+<<<<<<< HEAD
   "pathResult": "D:/azFinOps/Data/GetAzAllTags/",
   "fileResult": "GetAzAllTags",
   "chronoFile": "Y",
+=======
+  "pathResult": "C:/Users/fparment/Documents/AzFinOps/Data/GetAzAllTags/",
+  "fileResultXls": "GetAzAllTags",
+  "fileWithTags": "GetAzTags",
+  "fileWithNoTag": "GetAzNoTag",
+>>>>>>> 30dc8adf4443468348a854c825474d6c90a9f484
   "generateLogFile": "Y",
+  "chronoFile": "Y",
   "checkIfLogIn": "Y",
   "subscriptionsScope": {
+<<<<<<< HEAD
     "scope": "D:/azFinOps/Data/Alstom/subscriptions.csv",
+=======
+    "scope": "C:/Users/fparment/Documents/AzFinOps/Data/Alstom/subscriptions.csv",
+>>>>>>> 30dc8adf4443468348a854c825474d6c90a9f484
     "delimiter": ";"
   },
   "saveEvery": 100
