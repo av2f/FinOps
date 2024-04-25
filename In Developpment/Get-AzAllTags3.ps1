@@ -222,8 +222,8 @@ function SetObjResult {
   param(
     [array] $listResult
   )
-  if ($listResult.Count -ne 10) {
-    $listResult=@('-', '-', '-', '-', '-', '-', '-', '-', '-', '-')
+  if ($listResult.Count -ne 11) {
+    $listResult=@('-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-')
   }
   $objTagResult = @(
     [PSCustomObject]@{
@@ -235,8 +235,9 @@ function SetObjResult {
       ResourceId = $listResult[5]
       Location = $listResult[6]
       Status = $listResult[7]
-      FinOpsTagsMissing = $listResult[8]
-      TagsDefined = $listResult[9]
+      MissingFinOpsTags = $listResult[8]
+      NbOfMissingFinOpsTags = $listResult[9]
+      TagsDefined = $listResult[10]
     }
   )
   return $objTagResult
@@ -311,30 +312,26 @@ function GetSubscriptions
 function SearchFinOpsTags {
 
   param (
-    [String]$listTags,
-    [String]$finOpsTags
+    [Array]$listTags,
+    [Array]$finOpsTags
   )
 
   $arrayMissingFinOpsTags = @()
   $missingFinOpsTags = ""
   $missing = $false
+  $nbOfMissingFinOpsTags = 0
 
-  Write-Host "listTags = " $listTags + " - " $listTags.Count
-  Write-Host "finOpsTags = " $finOpsTags + " - " $finOpsTags.Count
-  
   foreach ($finOpsTag in $finOpsTags) {
-    Write-Host "Traitement de $finOpsTag"
-    if ($finOpsTag -cin $listTags) {
-      Write-Host "$finOpsTag absent"
+    if ($finOpsTag -cnotin $listTags) {
       $arrayMissingFinOpsTags += $finOpsTag
-      Write-Host $arrayMissingFinOpsTags "et il y a " $arrayMissingFinOpsTags.Count
+      $nbOfMissingFinOpsTags += 1
     }
   }
   if ($arrayMissingFinOpsTags.Count -gt 0) {
     $missingFinOpsTags = "{" + ($arrayMissingFinOpsTags -join ",") + "}"  
     $missing = $true
   }
-  return $missing,$missingFinOpsTags
+  return $missing,$nbOfMissingFinOpsTags,$missingFinOpsTags
 }
 
 function GetSubscriptionTags
@@ -372,7 +369,7 @@ function GetSubscriptionTags
   # Convert hash array into Json
   $tagsJson = $tags | ConvertTo-Json -Compress
   # Add to result object array
-  $subscriptionTags += (SetObjResult @($subscription.Name, $subscription.Id, '', '', 'Subscription', '', '', '', '', $tagsJson))
+  $subscriptionTags += (SetObjResult @($subscription.Name, $subscription.Id, '', '', 'Subscription', '', '', '', '', '', $tagsJson))
   return $subscriptionTags
 }
 
@@ -406,7 +403,7 @@ function GetResourceGroupTags
   # Convert hash array into Json
   $tagsJson = $tags | ConvertTo-Json -Compress
   # Add to result object array
-  $resourceGroupTags += (SetObjResult @($subscription.Name, $subscription.Id, $resourceGroup.ResourceGroupName, '', 'Resource Group', $resourceGroup.ResourceId, $resourceGroup.Location, '', '', $tagsJson))
+  $resourceGroupTags += (SetObjResult @($subscription.Name, $subscription.Id, $resourceGroup.ResourceGroupName, '', 'Resource Group', $resourceGroup.ResourceId, $resourceGroup.Location, '', '', '', $tagsJson))
   return $resourceGroupTags
 }
 
@@ -425,7 +422,7 @@ function GetResourceTags
     [Object[]]$subscription,
     [String]$resourceGroupName,
     [Object[]]$resource,
-    [String]$finOpsTags
+    [Array]$finOpsTags
   
   )
   
@@ -433,27 +430,37 @@ function GetResourceTags
   $tags = @{}
   $resourceTags = @()
   $listTags = @()
-  $status = "OK"
-  $listFinOpsMissingTags = ""
+  $status = "FinOps Tags present"
+  $listMissingFinOpsTags = ""
+  $NumberOfMissingFinOpsTags = $finOpsTags.Count
 
   if ($resource.Tags.Count -ne 0) {
     foreach ($key in $resource.Tags.keys) {
       $tags.Add($key, $resource.Tags[$key])
       $listTags += $key
     }
-    $missingFinOpsTags,$listFinOpsMissingTags = (SearchFinOpsTags -listTags $listTags -finOpsTags $finOpsTags)
-    if ($missing) {
-      $status = "FinOps tags missing"
+    $missingFinOpsTags,$nbOfMissingFinOpsTags,$listMissingFinOpsTags = (SearchFinOpsTags -listTags $listTags -finOpsTags $finOpsTags)
+    if ($missingFinOpsTags) {
+      $status = "Missing FinOps tags"
+      $NumberOfMissingFinOpsTags = $nbOfMissingFinOpsTags
+    }
+    else {
+      # All FinOps Tags are present
+      $NumberOfMissingFinOpsTags = 0
     }
   }
   else{
-    $status = "Tags not defined"
-    $tags.Add("Tag", "Not defined")
+    $status = "No tags defined"
+    $tags.Add("Tag", "Empty")
   }
   # Convert hash array into Json
   $tagsJson = $tags | ConvertTo-Json -Compress
   # Add to result object array
-  $resourceTags += SetObjResult @($subscription.Name, $subscription.Id, $resourceGroupName, $resource.Name, $resource.ResourceType, $resource.ResourceId, $resource.Location, $status, $listFinOpsMissingTags, $tagsJson)
+  $resourceTags += SetObjResult @(
+    $subscription.Name, $subscription.Id, $resourceGroupName, $resource.Name, $resource.ResourceType,
+    $resource.ResourceId, $resource.Location, $status,
+    $listMissingFinOpsTags, $NumberOfMissingFinOpsTags, $tagsJson
+  )
   return $resourceTags
 }
 
@@ -534,7 +541,7 @@ if ($subscriptions.Count -ne 0) {
           $arrayTags = @()
           $countResource = 0
           foreach ($resource in $resources) {
-            $arrayTags = (GetResourceTags -subscription $subscription -resourceGroupName $resourceGroup.ResourceGroupName -resource $resource -finOpsTags $finOpsTags)
+            $arrayTags += (GetResourceTags -subscription $subscription -resourceGroupName $resourceGroup.ResourceGroupName -resource $resource -finOpsTags $finOpsTags)
             $countResource += 1
             # if number of resources = SaveEvery in json file parameter, write in the result file and re-initiate the array and counter
             if ($countResource -eq $globalVar.saveEvery) {
