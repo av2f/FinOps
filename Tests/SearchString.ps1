@@ -41,7 +41,25 @@ ResourceType	VM
 
 # Retrieve global variables from json file
 $globalVar = Get-Content -Raw -Path ".\SearchString.json" | ConvertFrom-Json
+$finOpsTags = $globalVar.finopsTags.tagsName.split(",")
 
+Write-Host $finOpsTags.Count
+
+function TestArray {
+  param(
+    [Array]$finOpsTags
+  )
+
+  Write-Host "Il y a $($finOpsTags.Count) dans la table"
+  foreach($el in $finOpsTags) {
+    Write-Host $el
+  }
+
+}
+
+TestArray -finOpsTags $finOpsTags
+
+<#
 # set to the right context
 Set-AzContext -Subscription "c5ea61f3-1975-4b59-9e9c-66128b8989f3"
 
@@ -61,7 +79,7 @@ if ($resource.Tags.Count -ne 0) {
     }
   }
 }
-<#
+
 Write-Host $a.gettype()
 Write-Host $a
 Write-Host $a.count
