@@ -1,3 +1,20 @@
+# Retrieve global variables from json file
+$globalVar = Get-Content -Raw -Path ".\Tests.json" | ConvertFrom-Json
+if ($globalVar.tagCheckValue.ToUpper() -eq 'Y') {
+  Write-Host "aller je traite"
+  $array = $globalVar.tagsToCheck | Get-Member -MemberType NoteProperty | Select-Object -ExpandProperty Name
+  foreach($item in $array) {
+    Write-Host $item 
+    Write-Host $globalVar.tagsToCheck.$item.value
+    Write-Host $globalVar.tagsToCheck.$item.errorMessage
+  }
+}
+
+
+
+
+
+<#
 $string = "Environment,AIPCode,AIPName,AIPOwner,AIPCriticality,Customer,DepartmentName,Owner,Supported,SLA,ServiceWindows,IsItemizable"
 # $string2 = "Environment","AIPCode","AIPName","AIPOwner","AIPCriticality","Customer","DepartmentName","Owner","Supported","SLA","ServiceWindows","IsItemizable"
 $hash = @{}
@@ -43,3 +60,4 @@ if ($code -match $match) {
 else {
   Write-Host "No ne match pas"
 }
+#>
