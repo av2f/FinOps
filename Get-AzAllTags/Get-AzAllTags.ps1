@@ -1,7 +1,7 @@
 <#
   Name    : Get-AzAllTags.ps1
   Author  : Frederic Parmentier
-  Version : 1.1
+  Version : 1.2
   Creation Date : 02/01/2024
 
   Retrieve Tags defined in Subscriptions, Resource Groups and Resources, and store them in 
@@ -28,6 +28,8 @@ $globalVar = Get-Content -Raw -Path ".\GetAzAllTags.json" | ConvertFrom-Json
 #
 $globalChronoFile = (Get-Date -Format "MMddyyyyHHmmss") # Format for file with chrono
 $globalLog = $false # set to $true if generateLogFile in json file is set to "Y"
+# Create Array with FinOps Tags
+$finOpsTags = $globalVar.finOpsTags.split(",")
 
 <# -----------
   Declare Functions
@@ -102,6 +104,36 @@ function WriteLog
   $chrono = (Get-Date -Format "MM/dd/yyyy hh:mm:ss")
   $line = $chrono + ": " + $message
   Add-Content -Path $fileName -Value $line
+}
+
+function CreateExcelFile
+{
+  <#
+   Create an Excel file with the result csv files
+    Input:
+      - $excelFileName: Excel file name
+      - $csvFiles: Array of csv files with WorkSheetName
+        format: WorksheetName:CsvFileName
+      - $removeCsvFile: If set to $true, remove csv files after the export in the Excel file
+    Output: 
+      - the Excel file $excelFileName
+  #>
+  param(
+    [string]$excelFileName,
+    [hashtable]$csvFiles,
+    [boolean]$removeCsvFile
+  )
+  
+  # Create Excel File and Remove csv files if $removeCsvFile is set to True
+  foreach($key in $csvFiles.Keys) {
+    Import-Csv -Path $csvFiles[$key] | Export-Excel -Path $excelFileName -WorkSheetName $key
+    if ($removeCsvFile) {
+      if (Test-Path -Path $csvFiles[$key] -PathType Leaf)
+      {
+        Remove-Item -Path $csvFiles[$key] -Force
+      }
+    }
+  }
 }
 
 function CheckSaveEvery
@@ -190,8 +222,8 @@ function SetObjResult {
   param(
     [array] $listResult
   )
-  if ($listResult.Count -ne 9) {
-    $listResult=@('-', '-', '-', '-', '-', '-', '-', '-', '-')
+  if ($listResult.Count -ne 12) {
+    $listResult=@('-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-')
   }
   $objTagResult = @(
     [PSCustomObject]@{
@@ -202,8 +234,11 @@ function SetObjResult {
       ResourceType = $listResult[4]
       ResourceId = $listResult[5]
       Location = $listResult[6]
-      TagName = $listResult[7]
-      TagValue = $listResult[8]
+      Status = $listResult[7]
+      NbOfMissingFinOpsTags = $listResult[8]
+      MissingFinOpsTags = $listResult[9]
+      TagsNameDefined = $listResult[10]
+      TagsDefined = $listResult[11]
     }
   )
   return $objTagResult
@@ -275,6 +310,31 @@ function GetSubscriptions
   return $listSubscriptions
 }
 
+function SearchFinOpsTags {
+
+  param (
+    [Array]$listTags,
+    [Array]$finOpsTags
+  )
+
+  $arrayMissingFinOpsTags = @()
+  $missingFinOpsTags = ""
+  $missing = $false
+  $nbOfMissingFinOpsTags = 0
+
+  foreach ($finOpsTag in $finOpsTags) {
+    if ($finOpsTag -cnotin $listTags) {
+      $arrayMissingFinOpsTags += $finOpsTag
+      $nbOfMissingFinOpsTags += 1
+    }
+  }
+  if ($arrayMissingFinOpsTags.Count -gt 0) {
+    $missingFinOpsTags = "{" + ($arrayMissingFinOpsTags -join ",") + "}"  
+    $missing = $true
+  }
+  return $missing,$nbOfMissingFinOpsTags,$missingFinOpsTags
+}
+
 function GetSubscriptionTags
 {
    <#
@@ -285,23 +345,55 @@ function GetSubscriptionTags
       - Object Table with pair Tag Name / Tag Value
   #>
   param(
-    [Object[]]$subscription
+    [Object[]]$subscription,
+    [Array]$finOpsTags
   )
+  
+  $tagsJson = ""
+  $tags = @{}
   $subscriptionTags = @()
+  $listSubscriptionTags = @()
   $listTags = @()
+  $status = "FinOps tags present"
+  $listMissingFinOpsTags = ""
+  $listTagsName = "{}"
+  $NumberOfMissingFinOpsTags = $finOpsTags.Count
+
   # Retrieve Tags for the subscription
-  $listTags = (GetTags -subscriptionId $subscription.Id)
+  $listSubscriptionTags = (GetTags -subscriptionId $subscription.Id)
   # If there is at least 1 tag
-  if ($listTags.Count -ne 0) {
+  if ($listSubscriptionTags.Count -ne 0) {
     # Store each tags (key/value) in $subscriptionTags
-    foreach ($key in $listTags.keys) {
-      $subscriptionTags += (SetObjResult @($subscription.Name, $subscription.Id, '', '', 'Subscription', '', '', $key, $listTags[$key]))
+    foreach ($key in $listSubscriptionTags.keys) {
+      # Add Tags to Hash array
+      $tags.Add($key, $listSubscriptionTags[$key])
+      $listTags += $key
+    }
+    $listTags = $listTags | Sort-Object
+    $listTagsName = "{" + ($listTags -join ",") + "}"
+    $missingFinOpsTags,$nbOfMissingFinOpsTags,$listMissingFinOpsTags = (SearchFinOpsTags -listTags $listTags -finOpsTags $finOpsTags)
+    if ($missingFinOpsTags) {
+      $status = "Missing FinOps tags"
+      $NumberOfMissingFinOpsTags = $nbOfMissingFinOpsTags
+    }
+    else {
+      # All FinOps Tags are present
+      $NumberOfMissingFinOpsTags = 0
     }
   }
   # Store empty line
   else{
-    $subscriptionTags += (SetObjResult @($subscription.Name, $subscription.Id, '', '', 'Subscription', '', '', '-', '-'))
+    $status = "No tags defined"
+    $tags.Add("Tag", "Empty")
   }
+  # Convert hash array into Json
+  $tagsJson = $tags | ConvertTo-Json -Compress
+  # Add to result object array
+  $subscriptionTags += (
+    SetObjResult @($subscription.Name, $subscription.Id, '', '', 'Subscription',
+    '', '', $status,
+    $NumberOfMissingFinOpsTags, $listMissingFinOpsTags, $listTagsName, $tagsJson)
+  )
   return $subscriptionTags
 }
 
@@ -312,22 +404,54 @@ function GetResourceGroupTags
     Input :
       - $subscription: subscription of the resource Group
       - $resourceGroup: Object table that contains resource group informations for which tags must be sought
+      - $finOpsTags: List of FinOpsTags defined
     Output:
       - Object Table with pair Tag Name / Tag Value
   #>
   param(
     [Object[]]$subscription,
-    [Object[]]$resourceGroup
+    [Object[]]$resourceGroup,
+    [Array]$finOpsTags
   )
+  
+  $tagsJson = ""
+  $tags = @{}
   $resourceGroupTags = @()
+  $listTags = @()
+  $status = "FinOps tags present"
+  $listMissingFinOpsTags = ""
+  $listTagsName = "{}"
+  $NumberOfMissingFinOpsTags = $finOpsTags.Count
+  
   if ($resourceGroup.Tags.Count -ne 0) {
     foreach ($key in $resourceGroup.Tags.keys) {
-      $resourceGroupTags += (SetObjResult @($subscription.Name, $subscription.Id, $resourceGroup.ResourceGroupName, '', 'Resource Group', $resourceGroup.ResourceId, $resourceGroup.Location, $key, $resourceGroup.Tags[$key]))
+      $tags.Add($key, $resourceGroup.Tags[$key])
+      $listTags += $key
+    }
+    $listTags = $listTags | Sort-Object
+    $listTagsName = "{" + ($listTags -join ",") + "}"
+    $missingFinOpsTags,$nbOfMissingFinOpsTags,$listMissingFinOpsTags = (SearchFinOpsTags -listTags $listTags -finOpsTags $finOpsTags)
+    if ($missingFinOpsTags) {
+      $status = "Missing FinOps tags"
+      $NumberOfMissingFinOpsTags = $nbOfMissingFinOpsTags
+    }
+    else {
+      # All FinOps Tags are present
+      $NumberOfMissingFinOpsTags = 0
     }
   }
   else {
-    $resourceGroupTags += (SetObjResult @($subscription.Name, $subscription.Id, $resourceGroup.ResourceGroupName, '', 'Resource Group', $resourceGroup.ResourceId, $resourceGroup.Location, '-', '-'))
+    $status = "No tags defined"
+    $tags.Add("Tag", "Empty")
   }
+  # Convert hash array into Json
+  $tagsJson = $tags | ConvertTo-Json -Compress
+  # Add to result object array
+  $resourceGroupTags += (
+    SetObjResult @($subscription.Name, $subscription.Id, $resourceGroup.ResourceGroupName, '', 'Resource Group',
+    $resourceGroup.ResourceId, $resourceGroup.Location, $status,
+    $NumberOfMissingFinOpsTags, $listMissingFinOpsTags, $listTagsName, $tagsJson)
+  )
   return $resourceGroupTags
 }
 
@@ -339,23 +463,55 @@ function GetResourceTags
       - $subscription: Subscription of the resource group
       - $resourceGroupName: Resource Group name of resource
       - $resource: Object that contains resource informations for which tags must be sought
+      - $finOpsTags: List of FinOpsTags defined
     Output:
       - Object Table with pair Tag Name / Tag Value
   #>
   param(
     [Object[]]$subscription,
     [String]$resourceGroupName,
-    [Object[]]$resource
+    [Object[]]$resource,
+    [Array]$finOpsTags
   )
+  
+  $tagsJson = ""
+  $tags = @{}
   $resourceTags = @()
+  $listTags = @()
+  $status = "FinOps tags present"
+  $listMissingFinOpsTags = ""
+  $listTagsName = "{}"
+  $NumberOfMissingFinOpsTags = $finOpsTags.Count
+
   if ($resource.Tags.Count -ne 0) {
     foreach ($key in $resource.Tags.keys) {
-      $resourceTags += SetObjResult @($subscription.Name, $subscription.Id, $resourceGroupName, $resource.Name, $resource.ResourceType, $resource.ResourceId, $resource.Location, $key, $resource.Tags[$key])
+      $tags.Add($key, $resource.Tags[$key])
+      $listTags += $key
+    }
+    $listTags = $listTags | Sort-Object
+    $listTagsName = "{" + ($listTags -join ",") + "}"
+    $missingFinOpsTags,$nbOfMissingFinOpsTags,$listMissingFinOpsTags = (SearchFinOpsTags -listTags $listTags -finOpsTags $finOpsTags)
+    if ($missingFinOpsTags) {
+      $status = "Missing FinOps tags"
+      $NumberOfMissingFinOpsTags = $nbOfMissingFinOpsTags
+    }
+    else {
+      # All FinOps Tags are present
+      $NumberOfMissingFinOpsTags = 0
     }
   }
   else{
-    $resourceTags += SetObjResult @($subscription.Name, $subscription.Id, $resourceGroupName, $resource.Name, $resource.ResourceType, $resource.ResourceId, $resource.Location, '-', '-')
+    $status = "No tags defined"
+    $tags.Add("Tag", "Empty")
   }
+  # Convert hash array into Json
+  $tagsJson = $tags | ConvertTo-Json -Compress
+  # Add to result object array
+  $resourceTags += SetObjResult @(
+    $subscription.Name, $subscription.Id, $resourceGroupName, $resource.Name, $resource.ResourceType,
+    $resource.ResourceId, $resource.Location, $status,
+    $NumberOfMissingFinOpsTags, $listMissingFinOpsTags, $listTagsName, $tagsJson
+  )
   return $resourceTags
 }
 
@@ -365,8 +521,9 @@ Main Program
 --------------------------------------------------------------------------- #>
 # Create directory results if not exists and filename for results
 if ( (CreateDirectoryResult $globalVar.pathResult) ) {
-  # Create the CSV file result
-  $csvResFile = (CreateFile -pathName $globalVar.pathResult -fileName $globalVar.fileResult -extension 'csv' -chrono $globalVar.chronoFile)
+  # Create csv result file
+  $csvFileResult = (CreateFile -pathName $globalVar.pathResult -fileName $globalVar.fileResult -extension 'csv' -chrono $globalVar.chronoFile)
+  
   # if generateLogFile in Json file is set to "Y", create log file
   if ($globalVar.generateLogFile.ToUpper() -eq "Y") {
     # Create log file
@@ -389,7 +546,7 @@ Write-Verbose "$($subscriptions.Count) subscriptions found."
 if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: $($subscriptions.Count) subscriptions found.") }
 if ($subscriptions.Count -ne 0) {
   foreach ($subscription in $subscriptions) {
-    # Initate array Result
+    # Initate arrays Result
     $arrayTags = @()
     <# ------------
       Subscription processing
@@ -399,8 +556,9 @@ if ($subscriptions.Count -ne 0) {
     Write-Verbose "- Processing of the $($subscription.Name) subscription."
     Set-AzContext -Subscription $subscription.Id
     # Retrieve subscription tags and write in result file
-    $arrayTags += (GetSubscriptionTags -subscription $subscription)
-    $arrayTags | Export-Csv -Path $csvResFile -Delimiter ";" -NoTypeInformation -Append
+    $arrayTags = (GetSubscriptionTags -subscription $subscription -finOpsTags $finOpsTags)
+    $arrayTags | Export-Csv -Path $csvFileResult -Delimiter ";" -NoTypeInformation -Append
+
     <# ------------
       ResourceGroup processing
     ------------ #>
@@ -416,8 +574,8 @@ if ($subscriptions.Count -ne 0) {
       foreach ($resourceGroup in $resourceGroups) {
         $arrayTags = @()
         # Retrieve resource group Tags and write in result file
-        $arrayTags += (GetResourceGroupTags -subscription $subscription -ResourceGroup $resourceGroup)
-        $arrayTags | Export-Csv -Path $csvResFile -Delimiter ";" -NoTypeInformation -Append
+        $arrayTags = (GetResourceGroupTags -subscription $subscription -ResourceGroup $resourceGroup -finOpsTags $finOpsTags)
+        $arrayTags | Export-Csv -Path $csvFileResult -Delimiter ";" -NoTypeInformation -Append
         <# ------------
           Resources processing
         ------------ #>
@@ -431,31 +589,39 @@ if ($subscriptions.Count -ne 0) {
         Write-Verbose "--- $($numberOfResources) Resources found"
         
         if ($numberOfResources -ne 0) {
-          # if ($resources.Count -ne 0) {
           $arrayTags = @()
           $countResource = 0
           foreach ($resource in $resources) {
-            $arrayTags += (GetResourceTags -subscription $subscription -resourceGroupName $resourceGroup.ResourceGroupName -resource $resource)
+            $arrayTags += (GetResourceTags -subscription $subscription -resourceGroupName $resourceGroup.ResourceGroupName -resource $resource -finOpsTags $finOpsTags)
             $countResource += 1
             # if number of resources = SaveEvery in json file parameter, write in the result file and re-initiate the array and counter
             if ($countResource -eq $globalVar.saveEvery) {
-              $arrayTags | Export-Csv -Path $csvResFile -Delimiter ";" -NoTypeInformation -Append
+              if ($arrayTags.Count -gt 0) {$arrayTags | Export-Csv -Path $csvFileResult -Delimiter ";" -NoTypeInformation -Append }
               $arrayTags = @()
               $countResource = 0
             }
           }
           # Write last resources
-          if ($countResource -gt 0) { $arrayTags | Export-Csv -Path $csvResFile -Delimiter ";" -NoTypeInformation -Append }
+          if ($countResource -gt 0) {
+            $arrayTags | Export-Csv -Path $csvFileResult -Delimiter ";" -NoTypeInformation -Append
+          }
         }
       }
     }
     Write-Verbose "---------------------------------------------"
   }
-  if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: File $csvResFile is available.") }
-  Write-Verbose "File $csvResFile is available."
-  if ($globalLog) {
-    (WriteLog -fileName $logfile -message "INFO: End processing...") 
-  }
+  <#
+  # Build Excel file with results
+  if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Building Final Excel file results...") }
+  Write-Verbose "Building Final Excel file results..."
+  $csvFileToExcel = @{}
+  $csvFileToExcel.Add("AzTags", $csvFileTags)
+  $csvFileToExcel.Add("AzNoTags", $csvFileNoTags)
+  CreateExcelFile -excelFileName $xlsResFile -csvFiles $csvFileToExcel -removeCsvFile $false
+  #>
+
+  if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: File $csvFileResult is available.") }
+  Write-Verbose "File $csvFileResult is available."
 }
 else {
   if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: No Subscriptions enabled found.") }
@@ -506,7 +672,9 @@ if ($globalLog) {
   
   - checkIfLogIn: Y|N. Set to "Y" if you want to check if log in to Azure is done
 
-  - subscriptions: 
+  - finOpsTags: List of FinOps Tags with format: "tag1,tag2,tag2,tagn..."
+
+  - subscriptionsScope: 
     - scope: All|.csv file
       - if you set "All", process all subscription
       - if you set a .csv file, process subscriptions in file
