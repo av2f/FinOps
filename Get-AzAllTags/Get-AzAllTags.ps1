@@ -369,10 +369,12 @@ function GetSubscriptionTags
       $tags.Add($key, $listSubscriptionTags[$key])
       $listTags += $key
     }
+    # Check if FinOps tags are present
     $listTags = $listTags | Sort-Object
     $listTagsName = "{" + ($listTags -join ",") + "}"
     $missingFinOpsTags,$nbOfMissingFinOpsTags,$listMissingFinOpsTags = (SearchFinOpsTags -listTags $listTags -finOpsTags $finOpsTags)
     if ($missingFinOpsTags) {
+      # Some FinOps tags are missing
       $status = "Missing FinOps tags"
       $NumberOfMissingFinOpsTags = $nbOfMissingFinOpsTags
     }
@@ -428,10 +430,12 @@ function GetResourceGroupTags
       $tags.Add($key, $resourceGroup.Tags[$key])
       $listTags += $key
     }
+    # Check if FinOps tags are present
     $listTags = $listTags | Sort-Object
     $listTagsName = "{" + ($listTags -join ",") + "}"
     $missingFinOpsTags,$nbOfMissingFinOpsTags,$listMissingFinOpsTags = (SearchFinOpsTags -listTags $listTags -finOpsTags $finOpsTags)
     if ($missingFinOpsTags) {
+      # Some FinOps tags are missing
       $status = "Missing FinOps tags"
       $NumberOfMissingFinOpsTags = $nbOfMissingFinOpsTags
     }
@@ -488,10 +492,12 @@ function GetResourceTags
       $tags.Add($key, $resource.Tags[$key])
       $listTags += $key
     }
+    # Check if FinOps tags are present
     $listTags = $listTags | Sort-Object
     $listTagsName = "{" + ($listTags -join ",") + "}"
     $missingFinOpsTags,$nbOfMissingFinOpsTags,$listMissingFinOpsTags = (SearchFinOpsTags -listTags $listTags -finOpsTags $finOpsTags)
     if ($missingFinOpsTags) {
+      # Some FinOps tags are missing
       $status = "Missing FinOps tags"
       $NumberOfMissingFinOpsTags = $nbOfMissingFinOpsTags
     }
