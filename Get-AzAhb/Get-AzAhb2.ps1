@@ -358,6 +358,27 @@ function GetVmInfoOsFilterFromSubscription
   return $errorCount, $listVms
 }
 
+function GetVmImage
+{
+  param(
+    [String]$resourceId
+  )
+
+  # Retrieve Publisher and Image offer of VM
+  try {
+    $vmImage = (Get-AzVm -ResourceId $resourceId |
+      Select-Object -Property @{l="Publisher";e={$_.StorageProfile.ImageReference.Publisher}}, @{l="Offer";e={$_.StorageProfile.ImageReference.Offer}}
+    )
+  }
+  catch {
+    Write-Host "An error occured retrieving VMs offers from Resource Id $resourceId"
+    if ($globalLog) { (WriteLog -fileName $logfile -message "ERROR: An error occured retrieving VMs offers from Resource Id $resourceId") }
+    $vmImage = @('Error', 'Error')
+    $errorCount += 1
+  }
+  return $errorCount,$vmImage
+}
+
 function GetVmSizing
 {
   <#
@@ -614,6 +635,9 @@ if ($subscriptions.Count -ne 0) {
       foreach ($vm in $vms) {
         # -- Retrieve VM sizing
         $errorCount, $vmSizing = (GetVmSizing -rgName $vm.ResourceGroupName -vmName $vm.Name -sku $vm.VmSize)
+        $globalError += $errorCount
+        # -- Retrieve Publisher and Offer of VM
+        $errorCount,$vmImage = (GetVmImage -resourceId $vm.Id)
         $globalError += $errorCount
         # -- Calculate Cores and Licenses for Hybrid Benefits
         $resultCores = (
