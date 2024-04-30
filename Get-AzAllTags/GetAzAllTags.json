@@ -1,12 +1,12 @@
 {
-  "pathResult": "D:/azFinOps/Data/GetAzAllTags/",
+  "pathResult": "C:/Users/fparment/Documents/AzFinOps/Data/GetAzAllTags/",
   "fileResult": "GetAzAllTags",
   "generateLogFile": "Y",
   "chronoFile": "Y",
   "checkIfLogIn": "Y",
   "finOpsTags": "AIPCode,AIPCriticality,AIPName,AIPOwner,Customer,DepartmentName,Environment,IsItemizable,Owner,SLA,ServiceWindows,Supported",
   "subscriptionsScope": {
-    "scope": "D:/azFinOps/Data/Alstom/subscriptions.csv",
+    "scope": "C:/Users/fparment/Documents/AzFinOps/Data/Alstom/subscriptions.csv",
     "delimiter": ";"
   },
   "saveEvery": 100

@@ -1,7 +1,7 @@
 {
   "pathResult": "C:/Users/fparment/Documents/AzFinOps/Data/GetAzAhb/",
   "fileResult": "GetAzAhb",
-  "chronoFile": "N",
+  "chronoFile": "Y",
   "generateLogFile": "Y",
   "checkIfLogIn": "Y",
   "subscriptionsScope": {
@@ -22,8 +22,9 @@
     "cpuUsage": "Percentage CPU",
     "memoryAvailable": "Available Memory Bytes",
     "retentionDays": 30,
-    "timeGrain": "1.00:00:00"
+    "timeGrain": "01:00:00"
   },
+  "limitCountCpu": 0,
   "tags": {
     "environment": "Environment",
     "availability": "ServiceWindows"

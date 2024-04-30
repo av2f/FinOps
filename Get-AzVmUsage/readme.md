@@ -47,3 +47,8 @@ Updated date  : 04-20-2024
 Updated by    : Frederic Parmentier
 Update done   :
  - Add function GetTimeGrain to build the TimeSpan of TimeGrain
+
+Updated date  : 04-30-2024
+Updated by    : Frederic Parmentier
+Update done   :
+ - Change operator for calculation of limitCountCpu and limitCountMem: "Greater than" instead of "Greater or Equal" than limit defined in json parameter file (limitCountCpu and limitCountMem)

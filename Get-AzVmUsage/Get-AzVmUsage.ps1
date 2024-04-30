@@ -49,7 +49,7 @@ Set-Item -Path Env:\SuppressAzurePowerShellBreakingChangeWarnings -Value $true
   Declare global variables, arrays and objects
 ----------- #>
 # Retrieve global variables from json file
-$globalVar = Get-Content -Raw -Path ".\GetAzVmUsage.json" | ConvertFrom-Json
+$globalVar = Get-Content -Raw -Path "$($PSScriptRoot)\GetAzVmUsage.json" | ConvertFrom-Json
 #
 $globalError = 0  # to count errors
 $globalChronoFile = (Get-Date -Format "MMddyyyyHHmmss") # Format for file with chrono
@@ -382,7 +382,7 @@ function GetPercentCpuUsage
       # Min Processing
       if ([Math]::Round($avgCpu,2) -lt $calcCpuUsage['minReached']) { $calcCpuUsage['minReached'] = [Math]::Round($avgCpu,2) }
       # Limit Processing
-      if ($avgCpu -ge $limitCpu) { $calcCpuUsage['countLimitReached'] += 1 }
+      if ($avgCpu -gt $limitCpu) { $calcCpuUsage['countLimitReached'] += 1 }
     }
     # Average processing
     $calcCpuUsage['average'] = [Math]::Round($calcCpuUsage['average']/$avgCpus.count,2)
@@ -462,7 +462,7 @@ function GetPercentMemUsage
         # Min Processing
         if ([Math]::Round($avgAvailableMem,2) -lt $calcMemUsage['minReached']) { $calcMemUsage['minReached'] = [Math]::Round($avgAvailableMem,2) }
         # Limit Processing
-        if ($avgAvailableMem -ge $limitMem) { $calcMemUsage['countLimitReached'] += 1 }
+        if ($avgAvailableMem -gt $limitMem) { $calcMemUsage['countLimitReached'] += 1 }
       }
       # Average processing
       $calcMemUsage['average'] = [Math]::Round($calcMemUsage['average']/$avgAvailableMems.count,2)

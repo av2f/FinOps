@@ -52,7 +52,8 @@ Set-Item -Path Env:\SuppressAzurePowerShellBreakingChangeWarnings -Value $true
   Declare global variables, arrays and objects
 ----------- #>
 # Retrieve global variables from json file
-$globalVar = Get-Content -Raw -Path ".\GetAzAhb.json" | ConvertFrom-Json
+$globalVar = Get-Content -Raw -Path "$($PSScriptRoot)\GetAzAhb.json" | ConvertFrom-Json
+
 #
 $globalError = 0  # to count errors
 $globalChronoFile = (Get-Date -Format "MMddyyyyHHmmss") # Format for file with chrono
@@ -410,7 +411,8 @@ function GetAvgCpuUsage
     [String]$resourceId,
     [String]$metric,
     [Int16]$retentionDays,
-    [TimeSpan]$timeGrain
+    [TimeSpan]$timeGrain,
+    [Int16]$limitCpu
   )
   # Define Start and End dates
   $startTime = (Get-Date).AddDays(-$retentionDays)
@@ -422,16 +424,19 @@ function GetAvgCpuUsage
   }
 
   $errorCount = 0
+  $countLimitCpu = 0
   
   $resAvgCpuUsage = 0
   # Retrieve Average CPU usage in percentage
   $avgCpus = (Get-AzMetric -ResourceId $resourceId -MetricName $metric -StartTime $startTime -EndTime $endTime -AggregationType Average -TimeGrain $timeGrain |
-    ForEach-Object { $_.Data.Average })
+    ForEach-Object { $_.Data.Average } -ErrorAction SilentlyContinue
+  )
   
   if ($avgCpus.count -gt 0) {
     # Calculate Average of CPU usage in percentage
     foreach ($avgCpu in $avgCpus) {
       $resAvgCpuUsage += $avgCpu
+      if ($avgCpu -gt $limitCpu) { $countLimitCpu += 1}
     }
     $resAvgCpuUsage = [Math]::Round($resAvgCpuUsage/$avgCpus.count,2)
   }
@@ -441,7 +446,7 @@ function GetAvgCpuUsage
     $errorCount += 1
     $resAvgCpuUsage = -1
   }
-  return $errorCount,$resAvgCpuUsage
+  return $errorCount,$countLimitCpu,$resAvgCpuUsage
 }
 
 function GetAvgMemUsage
@@ -521,8 +526,8 @@ function SetObjResult {
   param(
     [array]$listResult
   )
-  if ($listResult.Count -ne 22) {
-    $listResult = @('-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-','-','-','-','-','-','-','-')
+  if ($listResult.Count -ne 23) {
+    $listResult = @('-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-','-','-','-','-','-','-','-','-')
   }
   $objTagResult = @(
     [PSCustomObject]@{
@@ -543,11 +548,12 @@ function SetObjResult {
       Tag_Environment = $listResult[14]
       Tag_Availability = $listResult[15]
       Avg_CPU_Usage_Percent = $listResult[16]
-      Avg_Mem_Usage_Percent = $listResult[17]
-      Nb_AHB_Cores_Consumed = $listResult[18]
-      Nb_AHB_Licenses_Consumed = $listResult[19]
-      Nb_AHB_Cores_Wasted = $listResult[20]
-      NB_AHB_Cores_Deallocated_Wasted = $listResult[21]
+      Count_Limit_Cpu = $listResult[17]
+      Avg_Mem_Usage_Percent = $listResult[18]
+      Nb_AHB_Cores_Consumed = $listResult[19]
+      Nb_AHB_Licenses_Consumed = $listResult[20]
+      Nb_AHB_Cores_Wasted = $listResult[21]
+      NB_AHB_Cores_Deallocated_Wasted = $listResult[22]
     }
   )
   return $objTagResult
@@ -614,8 +620,8 @@ if ($subscriptions.Count -ne 0) {
           CalcCores -nbCores $vmSizing.NumberOfCores -coresByLicense $globalVar.weightLicenseInCores -licenseType $vm.LicenseType -powerState $vm.PowerState
         )
         # -- Calculate CPU usage in percentage
-        $errorCount, $avgPercentCpu = (
-          GetAvgCpuUsage -resourceId $vm.Id -metric $globalVar.metrics.cpuUsage -retentionDays $globalVar.metrics.retentionDays -timeGrain $timeGrain
+        $errorCount, $countLimitCpu, $avgPercentCpu = (
+          GetAvgCpuUsage -resourceId $vm.Id -metric $globalVar.metrics.cpuUsage -retentionDays $globalVar.metrics.retentionDays -timeGrain $timeGrain -limitCpu $globalVar.limitCountCpu
         )
         $globalError += $errorCount
         # -- Calculate Memory usage in percentage
@@ -629,7 +635,7 @@ if ($subscriptions.Count -ne 0) {
           $vm.Name, $vm.VmId, $vm.Id, $vm.Location, $vm.PowerState,
           $vm.OsType, $vm.OsName, $vm.LicenseType,
           $vm.VmSize, $vmSizing.NumberOfCores, $vmSizing.MemoryInMB,
-          $vm.TagEnvironment,$vm.TagAvailability,$avgPercentCpu, $avgPercentMem, $resultCores['CoresConsumed'],
+          $vm.TagEnvironment,$vm.TagAvailability,$avgPercentCpu, $countLimitCpu, $avgPercentMem, $resultCores['CoresConsumed'],
           $resultCores['licensesConsumed'], $resultCores['coresWasted'], $resultCores['coresDeallocatedWasted']
         )
         $vmTotalSubscription += 1
