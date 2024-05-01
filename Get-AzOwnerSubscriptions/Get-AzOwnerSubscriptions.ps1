@@ -28,7 +28,7 @@ Set-Item -Path Env:\SuppressAzurePowerShellBreakingChangeWarnings -Value $true
   Declare global variables, arrays and objects
 ----------- #>
 # Retrieve global variables from json file
-$globalVar = Get-Content -Raw -Path "$($PSScriptRoot)\GetAzOwnerSubscriptions.json" | ConvertFrom-Json
+$globalVar = Get-Content -Raw -Path "$($PSScriptRoot)\Get-AzOwnerSubscriptions.json" | ConvertFrom-Json
 #
 $globalChronoFile = (Get-Date -Format "MMddyyyyHHmmss") # Format for file with chrono
 $globalLog = $false # set to $true if generateLogFile in json file is set to "Y"

@@ -1,7 +1,7 @@
 <#
   Name    : Get-AzAhb.ps1
   Author  : Frederic Parmentier
-  Version : 1.2
+  Version : 1.3
   Creation Date : 04/02/2024
  
   Help to optimize Azure Hybrid Benefit (AHB) management
@@ -18,6 +18,8 @@
   - License Type: 
     - if "Windows_Server" then AHB is applied
     - if "Windows_Client" then Azure Virtual Desktop is applied
+  - The Image Offer
+  - The Image Publisher
   - Size of VM
   - Number of Cores of VMs
   - RAM of VMs
@@ -26,6 +28,7 @@
   - Calculate for each VMs:
     - Average CPU usage in percentage during the retention days indicated in the Json parameter file
     - Average Memory usage in percentage during the retention days indicated in the Json parameter file
+    - The number of time the CPU reaches the threshold defined the Json parameter file (limitCountCpu)
   - Calculate if AHB applied
     - Number of AHB cores consumed
     - Number of AHB licenses consumed
@@ -52,7 +55,8 @@ Set-Item -Path Env:\SuppressAzurePowerShellBreakingChangeWarnings -Value $true
   Declare global variables, arrays and objects
 ----------- #>
 # Retrieve global variables from json file
-$globalVar = Get-Content -Raw -Path ".\GetAzAhb.json" | ConvertFrom-Json
+$globalVar = Get-Content -Raw -Path "$($PSScriptRoot)\Get-AzAhb.json" | ConvertFrom-Json
+
 #
 $globalError = 0  # to count errors
 $globalChronoFile = (Get-Date -Format "MMddyyyyHHmmss") # Format for file with chrono
@@ -357,6 +361,27 @@ function GetVmInfoOsFilterFromSubscription
   return $errorCount, $listVms
 }
 
+function GetVmImage
+{
+  param(
+    [String]$resourceId
+  )
+
+  # Retrieve Publisher and Image offer of VM
+  try {
+    $vmImage = (Get-AzVm -ResourceId $resourceId |
+      Select-Object -Property @{l="Publisher";e={$_.StorageProfile.ImageReference.Publisher}}, @{l="Offer";e={$_.StorageProfile.ImageReference.Offer}}
+    )
+  }
+  catch {
+    Write-Host "An error occured retrieving VMs offers from Resource Id $resourceId"
+    if ($globalLog) { (WriteLog -fileName $logfile -message "ERROR: An error occured retrieving VMs offers from Resource Id $resourceId") }
+    $vmImage = @('Error', 'Error')
+    $errorCount += 1
+  }
+  return $errorCount,$vmImage
+}
+
 function GetVmSizing
 {
   <#
@@ -402,15 +427,18 @@ function GetAvgCpuUsage
       - $metric: Metric to use to calculate
       - $retentionDays: Number of days to calculate the average. Limit max = 30 days
       - $timeGrain: Granularity of time
+      - $limitCpu: To count the number of time the CPU reached $limitCpu
     Output:
       - $errorCount: Nb of errors detected
       - $resAvgCpuUsage: Average in percentage of CPU usage during the last $retentionDays
+      - $countLimitCPU: count the number of time the CPU reaches $limitCpu
   #>
   param(
     [String]$resourceId,
     [String]$metric,
     [Int16]$retentionDays,
-    [TimeSpan]$timeGrain
+    [TimeSpan]$timeGrain,
+    [Int16]$limitCpu
   )
   # Define Start and End dates
   $startTime = (Get-Date).AddDays(-$retentionDays)
@@ -422,16 +450,19 @@ function GetAvgCpuUsage
   }
 
   $errorCount = 0
+  $countLimitCpu = 0
   
   $resAvgCpuUsage = 0
   # Retrieve Average CPU usage in percentage
   $avgCpus = (Get-AzMetric -ResourceId $resourceId -MetricName $metric -StartTime $startTime -EndTime $endTime -AggregationType Average -TimeGrain $timeGrain |
-    ForEach-Object { $_.Data.Average })
+    ForEach-Object { $_.Data.Average } -ErrorAction SilentlyContinue
+  )
   
   if ($avgCpus.count -gt 0) {
     # Calculate Average of CPU usage in percentage
     foreach ($avgCpu in $avgCpus) {
       $resAvgCpuUsage += $avgCpu
+      if ($avgCpu -gt $limitCpu) { $countLimitCpu += 1}
     }
     $resAvgCpuUsage = [Math]::Round($resAvgCpuUsage/$avgCpus.count,2)
   }
@@ -441,7 +472,7 @@ function GetAvgCpuUsage
     $errorCount += 1
     $resAvgCpuUsage = -1
   }
-  return $errorCount,$resAvgCpuUsage
+  return $errorCount,$countLimitCpu,$resAvgCpuUsage
 }
 
 function GetAvgMemUsage
@@ -521,8 +552,8 @@ function SetObjResult {
   param(
     [array]$listResult
   )
-  if ($listResult.Count -ne 22) {
-    $listResult = @('-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-','-','-','-','-','-','-','-')
+  if ($listResult.Count -ne 25) {
+    $listResult = @('-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-','-','-','-','-','-','-','-','-','-','-','-')
   }
   $objTagResult = @(
     [PSCustomObject]@{
@@ -537,17 +568,20 @@ function SetObjResult {
       Os_Type = $listResult[8]
       Os_Name = $listResult[9]
       License_Type = $listResult[10]
-      Size = $listResult[11]
-      Nb_Cores = $listResult[12]
-      Ram = $listResult[13]
-      Tag_Environment = $listResult[14]
-      Tag_Availability = $listResult[15]
-      Avg_CPU_Usage_Percent = $listResult[16]
-      Avg_Mem_Usage_Percent = $listResult[17]
-      Nb_AHB_Cores_Consumed = $listResult[18]
-      Nb_AHB_Licenses_Consumed = $listResult[19]
-      Nb_AHB_Cores_Wasted = $listResult[20]
-      NB_AHB_Cores_Deallocated_Wasted = $listResult[21]
+      Image_Offer = $listResult[11]
+      Image_Publisher = $listResult[12]
+      Size = $listResult[13]
+      Nb_Cores = $listResult[14]
+      Ram = $listResult[15]
+      Tag_Environment = $listResult[16]
+      Tag_Availability = $listResult[17]
+      Avg_CPU_Usage_Percent = $listResult[18]
+      Count_Limit_Cpu = $listResult[19]
+      Avg_Mem_Usage_Percent = $listResult[20]
+      Nb_AHB_Cores_Consumed = $listResult[21]
+      Nb_AHB_Licenses_Consumed = $listResult[22]
+      Nb_AHB_Cores_Wasted = $listResult[23]
+      NB_AHB_Cores_Deallocated_Wasted = $listResult[24]
     }
   )
   return $objTagResult
@@ -609,13 +643,16 @@ if ($subscriptions.Count -ne 0) {
         # -- Retrieve VM sizing
         $errorCount, $vmSizing = (GetVmSizing -rgName $vm.ResourceGroupName -vmName $vm.Name -sku $vm.VmSize)
         $globalError += $errorCount
+        # -- Retrieve Publisher and Offer of VM
+        $errorCount,$vmImage = (GetVmImage -resourceId $vm.Id)
+        $globalError += $errorCount
         # -- Calculate Cores and Licenses for Hybrid Benefits
         $resultCores = (
           CalcCores -nbCores $vmSizing.NumberOfCores -coresByLicense $globalVar.weightLicenseInCores -licenseType $vm.LicenseType -powerState $vm.PowerState
         )
         # -- Calculate CPU usage in percentage
-        $errorCount, $avgPercentCpu = (
-          GetAvgCpuUsage -resourceId $vm.Id -metric $globalVar.metrics.cpuUsage -retentionDays $globalVar.metrics.retentionDays -timeGrain $timeGrain
+        $errorCount, $countLimitCpu, $avgPercentCpu = (
+          GetAvgCpuUsage -resourceId $vm.Id -metric $globalVar.metrics.cpuUsage -retentionDays $globalVar.metrics.retentionDays -timeGrain $timeGrain -limitCpu $globalVar.limitCountCpu
         )
         $globalError += $errorCount
         # -- Calculate Memory usage in percentage
@@ -627,9 +664,9 @@ if ($subscriptions.Count -ne 0) {
         $arrayVm += SetObjResult @(
           $subscription.Name, $subscription.Id, $vm.ResourceGroupName,
           $vm.Name, $vm.VmId, $vm.Id, $vm.Location, $vm.PowerState,
-          $vm.OsType, $vm.OsName, $vm.LicenseType,
+          $vm.OsType, $vm.OsName, $vm.LicenseType,$vmImage.Offer,$vmImage.Publisher 
           $vm.VmSize, $vmSizing.NumberOfCores, $vmSizing.MemoryInMB,
-          $vm.TagEnvironment,$vm.TagAvailability,$avgPercentCpu, $avgPercentMem, $resultCores['CoresConsumed'],
+          $vm.TagEnvironment,$vm.TagAvailability,$avgPercentCpu, $countLimitCpu, $avgPercentMem, $resultCores['CoresConsumed'],
           $resultCores['licensesConsumed'], $resultCores['coresWasted'], $resultCores['coresDeallocatedWasted']
         )
         $vmTotalSubscription += 1
@@ -680,6 +717,8 @@ if ($globalLog) {
   - Os Type
   - Os Name
   - License Type (Windows_Server when AHB applied)
+  - Image Offer
+  - Image Publisher
   - VM Size
   - Number of cores and RAM in MB
   - Tag Environment if existing
@@ -689,6 +728,7 @@ if ($globalLog) {
     - 2 calcultated columns for each VMs
       +Average CPU usage in percentage during the retention days indicated in the Json parameter file
       + Average Memory usage in percentage during the retention days indicated in the Json parameter file
+      + The number of time the CPU reaches the threshold defined the Json parameter file (limitCountCpu)
     - 4 calculated columns for VMs for which AHB is applied:
       + Number of AHB cores consumed
       + Number of AHB licenses consumed

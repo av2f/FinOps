@@ -49,7 +49,7 @@ Set-Item -Path Env:\SuppressAzurePowerShellBreakingChangeWarnings -Value $true
   Declare global variables, arrays and objects
 ----------- #>
 # Retrieve global variables from json file
-$globalVar = Get-Content -Raw -Path "$($PSScriptRoot)\GetAzVmUsage.json" | ConvertFrom-Json
+$globalVar = Get-Content -Raw -Path "$($PSScriptRoot)\Get-AzVmUsage.json" | ConvertFrom-Json
 #
 $globalError = 0  # to count errors
 $globalChronoFile = (Get-Date -Format "MMddyyyyHHmmss") # Format for file with chrono

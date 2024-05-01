@@ -1,5 +1,5 @@
 Name    : Get-AzAhb.ps1
-Version : 1.2
+Version : 1.3
 ** Created by **
 Author: Frederic Parmentier
 Date: 04-10-2024
@@ -39,12 +39,12 @@ For more information, type Get-Help .\Get-AzAhb.ps1 [-detailed | -full]
 Global variables are stored in .\GetAzAhb.json and must be adapted accordingly:
 {
   "pathResult": "D:/azFinOps/Data/GetAzAhb/", # Path to store result and log files
-  "fileResult": "GetAzAhb",                   # Name of the result file
+  "fileResult": "GetAzAhb",                   # Name of the result and log files
   "chronoFile": "Y",                          # Y = result and log files is built with a chrono in the format "mmddyyyyhhmmss", N = No chrono
   "generateLogFile": "Y",                     # Y = generate a log file, N = No log file
   "checkIfLogIn": "Y",                        # Y = Check first if already log in to Azure, N = No control
   "subscriptionsScope": {
-    "scope": "All",                           # All = process on all Azure subecriptions, csv file in format "Name, Id"
+    "scope": "All",                           # All = process on all Azure subscriptions or csv file name in format "Name, Id"
     "delimiter": ";"                          # if csv file specified, define the delimiter
   },
   "osTypeFilter": "Windows",                  # Specify which OS type to filter for the result 
@@ -75,10 +75,16 @@ Global variables are stored in .\GetAzAhb.json and must be adapted accordingly:
 Updated date  : 04-17-2024
 Updated by    : Frederic Parmentier
 Update done   :
- - Add function GetTimeGrain to build the TimeSpan of TimeGrain
+ - Added function GetTimeGrain to build the TimeSpan of TimeGrain
 
 Updated date  : 04-22-2024
 Updated by    : Frederic Parmentier
 Update done   :
- - Improve time to retrieve of VMs informations
- - fix bug for AvgCpuUsage and AvgMemUsage calculation to avoid division by zero
+ - Improvement of time to retrieve VMs informations (at subscription level)
+ - Bug fixed for AvgCpuUsage and AvgMemUsage calculation to avoid division by zero
+
+Updated date  : 04-30-2024
+Updated by    : Frederic Parmentier
+Update done   :
+ - Added Count_Limit_Cpu column to have an estimation of VM usage on a month
+ - Added Image_Offer and Image_Publisher columns to improve the OS search
