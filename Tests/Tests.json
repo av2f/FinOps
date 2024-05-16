@@ -8,11 +8,13 @@
   "tagCheckValue": "Y",
   "tagsToCheck": {
     "Environment": {
-      "value": "Prod,Pre-Prod",
+      "type": "list",
+      "value": "Prod,Pre-prod,Qual,Dev,Test,Training,Sandbox,Uat",
       "errorMessage": "Bad value"
     },
     "AIPCode": {
-      "value": "regex/^([0-9]{5})$",
+      "type": "regex",
+      "value": "^([0-9]{5})$",
       "errorMessage": "Bad format"
     }
   },

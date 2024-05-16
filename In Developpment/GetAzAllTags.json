@@ -1,23 +1,25 @@
 {
-  "pathResult": "D:/azFinOps/Data/GetAzAllTags/",
+  "pathResult": "C:/Users/fparment/Documents/AzFinOps/Data/GetAzAllTags/",
   "fileResult": "GetAzAllTags",
   "generateLogFile": "Y",
   "chronoFile": "Y",
   "checkIfLogIn": "Y",
   "finOpsTags": "AIPCode,AIPCriticality,AIPName,AIPOwner,Customer,DepartmentName,Environment,IsItemizable,Owner,SLA,ServiceWindows,Supported",
   "tagCheckValue": "Y",
-  "tagsToCheck": {
+  "patternTagValues": {
     "Environment": {
+      "type": "list",
       "value": "Prod,Pre-Prod",
       "errorMessage": "Bad value"
     },
     "AIPCode": {
-      "value": "regex/^([0-9]{5})$",
+      "type": "regex",
+      "value": "^([0-9]{5})$",
       "errorMessage": "Bad format"
     }
   },
   "subscriptionsScope": {
-    "scope": "D:/azFinOps/Data/Alstom/subscriptions.csv",
+    "scope": "C:/Users/fparment/Documents/AzFinOps/Data/Alstom/subscriptions.csv",
     "delimiter": ";"
   },
   "saveEvery": 100
