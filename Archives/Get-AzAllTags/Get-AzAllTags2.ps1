@@ -24,7 +24,7 @@ Set-Item -Path Env:\SuppressAzurePowerShellBreakingChangeWarnings -Value $true
   Declare global variables, arrays and objects
 ----------- #>
 # Retrieve global variables from json file
-$globalVar = Get-Content -Raw -Path ".\GetAzAllTags.json" | ConvertFrom-Json
+$globalVar = Get-Content -Raw -Path "$($PSScriptRoot)\Get-AzAllTags.json" | ConvertFrom-Json
 #
 $globalChronoFile = (Get-Date -Format "MMddyyyyHHmmss") # Format for file with chrono
 $globalLog = $false # set to $true if generateLogFile in json file is set to "Y"
@@ -311,16 +311,6 @@ function GetSubscriptions
 }
 
 function SearchFinOpsTags {
-  <#
-    Search from tag names defined for the resource the finOps tag names defined in the json file parameter.
-    Input :
-      - $listTags : List of tag names defined for the resource
-      - $finOpsTags : List of finOps tag names to search
-    Output:
-      - $missing : $true is some finOps tags are missing
-      - $nbOfMissingFinOpsTags : Number of finOps tags missing
-      - $missingFinOpsTags : List of finOps tags missing
-  #>
 
   param (
     [Array]$listTags,
@@ -343,32 +333,6 @@ function SearchFinOpsTags {
     $missing = $true
   }
   return $missing,$nbOfMissingFinOpsTags,$missingFinOpsTags
-}
-
-function AnalyzeTagNames{
-  <#
-    -------------------- A REVOIR
-    Retrieve pair Tag Name / Tag Value for subcriptions
-    Input :
-      - $subscription: Object table of subscription for which tags must be sought
-    Output:
-      - Object Table with pair Tag Name / Tag Value
-  #>
-  param(
-    [Array]$tagNames,
-    [Array]$finOpsTags
-  )
-
-  $tags = @{}
-  $listTags = @()
-
-  # Store each tags (key/value) in $tags and tag name in $listTags
-  foreach ($key in $tagNames.keys) {
-    # Add Tags to Hash array
-    $tags.Add($key, $tagNames[$key])
-    $listTags += $key
-  }
-
 }
 
 function GetSubscriptionTags
@@ -405,10 +369,12 @@ function GetSubscriptionTags
       $tags.Add($key, $listSubscriptionTags[$key])
       $listTags += $key
     }
+    # Check if FinOps tags are present
     $listTags = $listTags | Sort-Object
     $listTagsName = "{" + ($listTags -join ",") + "}"
     $missingFinOpsTags,$nbOfMissingFinOpsTags,$listMissingFinOpsTags = (SearchFinOpsTags -listTags $listTags -finOpsTags $finOpsTags)
     if ($missingFinOpsTags) {
+      # Some FinOps tags are missing
       $status = "Missing FinOps tags"
       $NumberOfMissingFinOpsTags = $nbOfMissingFinOpsTags
     }
@@ -464,10 +430,12 @@ function GetResourceGroupTags
       $tags.Add($key, $resourceGroup.Tags[$key])
       $listTags += $key
     }
+    # Check if FinOps tags are present
     $listTags = $listTags | Sort-Object
     $listTagsName = "{" + ($listTags -join ",") + "}"
     $missingFinOpsTags,$nbOfMissingFinOpsTags,$listMissingFinOpsTags = (SearchFinOpsTags -listTags $listTags -finOpsTags $finOpsTags)
     if ($missingFinOpsTags) {
+      # Some FinOps tags are missing
       $status = "Missing FinOps tags"
       $NumberOfMissingFinOpsTags = $nbOfMissingFinOpsTags
     }
@@ -524,10 +492,12 @@ function GetResourceTags
       $tags.Add($key, $resource.Tags[$key])
       $listTags += $key
     }
+    # Check if FinOps tags are present
     $listTags = $listTags | Sort-Object
     $listTagsName = "{" + ($listTags -join ",") + "}"
     $missingFinOpsTags,$nbOfMissingFinOpsTags,$listMissingFinOpsTags = (SearchFinOpsTags -listTags $listTags -finOpsTags $finOpsTags)
     if ($missingFinOpsTags) {
+      # Some FinOps tags are missing
       $status = "Missing FinOps tags"
       $NumberOfMissingFinOpsTags = $nbOfMissingFinOpsTags
     }

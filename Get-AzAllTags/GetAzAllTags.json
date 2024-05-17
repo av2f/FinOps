@@ -9,7 +9,7 @@
   "patternTagValues": {
     "Environment": {
       "type": "list",
-      "value": "Prod,Pre-Prod",
+      "value": "Prod,Pre-prod,Qual,Dev,Test,Training,Sandbox,Uat",
       "errorMessage": "Bad value"
     },
     "AIPCode": {

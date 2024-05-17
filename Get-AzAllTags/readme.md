@@ -1,5 +1,5 @@
 Name    : Get-AzAllTags.ps1
-Version : 1.2
+Version : 1.3
 
 ** Description **
 Retrieve Tags defined in Subscriptions, Resource Groups and Resources, and store them in .\GetAzAllTags\GetAzAllTags[mmddyyyyhhmmss].csv
@@ -38,3 +38,22 @@ Update done   :
   + MissingFinOpsTags: List of missing FinOps tags
   + TagsNameDefined: List of tags name defined
   + TagsDefined: list of Tags defined with name and value in Json format
+
+  ** Updates **
+Updated date  : 05-17-2024
+Updated by    : Frederic Parmentier
+Update done   :
+ - Add analyze of Tag values
+ - 2 New columns Added in csv result file :
+  + NbOfBadValue : Number of bad value from FinOps tags defined
+  + BadValueFinOpsTags : List of tags that have bad value
+
+- Add parameters in Json file parameter :
+  + tagCheckValue : Y|N. if set to "Y" perform the checking of values
+  + patternTagValues : Defined pattern to find specific value for a tag
+    Example :
+    "Environment": {   => Name of the tag to check
+      "type": "list", => type of value to search (list = list of value, regex = regex pattern, string = string to search)
+      "value": "Prod,Pre-prod,Qual,Dev,Test,Training,Sandbox,Uat", => value(s) to search
+      "errorMessage": "Bad value" => error message to write in csv result file if bad value
+    }

@@ -1,7 +1,7 @@
 <#
   Name    : Get-AzAllTags.ps1
   Author  : Frederic Parmentier
-  Version : 1.2
+  Version : 1.3
   Creation Date : 02/01/2024
 
   Retrieve Tags defined in Subscriptions, Resource Groups and Resources, and store them in 
@@ -24,7 +24,7 @@ Set-Item -Path Env:\SuppressAzurePowerShellBreakingChangeWarnings -Value $true
   Declare global variables, arrays and objects
 ----------- #>
 # Retrieve global variables from json file
-$globalVar = Get-Content -Raw -Path "$($PSScriptRoot)\Get-AzAllTags.json" | ConvertFrom-Json
+$globalVar = Get-Content -Raw -Path ".\GetAzAllTags.json" | ConvertFrom-Json
 #
 $globalChronoFile = (Get-Date -Format "MMddyyyyHHmmss") # Format for file with chrono
 $globalLog = $false # set to $true if generateLogFile in json file is set to "Y"
@@ -222,8 +222,8 @@ function SetObjResult {
   param(
     [array] $listResult
   )
-  if ($listResult.Count -ne 12) {
-    $listResult=@('-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-')
+  if ($listResult.Count -ne 14) {
+    $listResult=@('-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-')
   }
   $objTagResult = @(
     [PSCustomObject]@{
@@ -234,11 +234,13 @@ function SetObjResult {
       ResourceType = $listResult[4]
       ResourceId = $listResult[5]
       Location = $listResult[6]
-      Status = $listResult[7]
+      StatusTagNames = $listResult[7]
       NbOfMissingFinOpsTags = $listResult[8]
       MissingFinOpsTags = $listResult[9]
       TagsNameDefined = $listResult[10]
-      TagsDefined = $listResult[11]
+      NbOfBadValue = $listResult[11]
+      BadValueFinOpsTags = $listResult[12]
+      TagsDefined = $listResult[13]
     }
   )
   return $objTagResult
@@ -310,7 +312,18 @@ function GetSubscriptions
   return $listSubscriptions
 }
 
-function SearchFinOpsTags {
+function SearchFinOpsTags
+{
+  <#
+    Search from tag names defined for the resource the finOps tag names defined in the json file parameter.
+    Input :
+      - $listTags : List of tag names defined for the resource
+      - $finOpsTags : List of finOps tag names to search
+    Output:
+      - $missing : $true is some finOps tags are missing
+      - $nbOfMissingFinOpsTags : Number of finOps tags missing
+      - $missingFinOpsTags : List of finOps tags missing
+  #>
 
   param (
     [Array]$listTags,
@@ -335,66 +348,209 @@ function SearchFinOpsTags {
   return $missing,$nbOfMissingFinOpsTags,$missingFinOpsTags
 }
 
+function AnalyzeTagNames
+{
+  <#
+    Analysis of FinOps Tag names
+    Check if all FinOps tags are declared
+    Input :
+      - $tags : list of tags (name/Value) declared
+      - $finOpsTags : List of finOps Tags Names declared in the Json file parameter
+    Output:
+      - $status : string that summarize status about FinOps Tags
+      - $numberOfMissingFinOpsTags : Number of missing FinOps tags
+      - $listMissingFinOpsTags : List of Missing FinOps Tags
+      - $listTagNames : complete list of declared tag names
+      - $tagsJson : complete list of declared tags (name and value)
+  #>
+  param(
+    [Hashtable]$tags,
+    [Array]$finOpsTags
+  )
+
+  $listTags = @()
+  $listTagNames = "{}"
+  $status = "FinOps tags present"
+  $tagsJson = ""
+
+  $numberOfMissingFinOpsTags = $finOpsTags.Count
+
+  # Store tag names in $listTags
+  foreach ($key in $tags.keys) {
+    $listTags += $key
+  }
+
+  $listTags = $listTags | Sort-Object
+  $listTagNames = "{" + ($listTags -join ",") + "}"
+
+  $missingFinOpsTags,$nbOfMissingFinOpsTags,$listMissingFinOpsTags = (SearchFinOpsTags -listTags $listTags -finOpsTags $finOpsTags)
+  if ($missingFinOpsTags) {
+    $status = "Missing FinOps tags"
+    $numberOfMissingFinOpsTags = $nbOfMissingFinOpsTags
+  }
+  else {
+    # All FinOps Tags are present
+    $numberOfMissingFinOpsTags = 0
+  }
+  # Convert hash array into Json
+  $tagsJson = $tags | ConvertTo-Json -Compress
+
+  return $status,$numberOfMissingFinOpsTags,$listMissingFinOpsTags,$listTagNames,$tagsJson
+}
+
+function AnalyzeTagValues
+{
+  <#
+    ============= A REVOIR ====================
+    Analysis of FinOps Tag values
+    2 possibilities :
+      - A pattern is defined in json file parameter for a tag : checking with pattern
+      - No pattern is defined : check if the value is not empty
+    Input :
+      - $tagsValueToCheck : list of tags (name/Value) to check value
+      - $finOpsTags : List of finOps Tags Names declared in the Json file parameter
+      - patternTagValues : patterns defined in the json file parameter
+    Output:
+      - $nbOfBadValue : Number of FinOps tags with bad value
+      - $badTagValueJson : List of tags with bad value
+  #>
+  param(
+    [Hashtable]$tagsValueToCheck,
+    [Array]$finOpsTags,
+    [Object]$patternTagValues
+  )
+
+  $badTagValue = @{}
+  $nbOfBadValue = 0
+
+  $patternTagNames = $patternTagValues | Get-Member -MemberType NoteProperty | Select-Object -ExpandProperty Name
+
+  foreach($key in $tagsValueToCheck.keys) {
+    if ($key -cin $finOpsTags) {
+      # Check if the tag is in pattern
+      $itemFound = $false
+      foreach($item in $patternTagNames) {
+        if ($item -ceq $key) {
+          $badValue = $false
+          switch ($patternTagValues.$item.type)
+          {
+            "list"
+            {
+              $listValue = $($patternTagValues.$item.value).split(",")
+              if ($($tagsValueToCheck[$key]) -cnotin $listValue) {
+                $badValue = $true
+              }
+            }
+            "regex"
+            {
+              if ($($tagsValueToCheck[$key]) -notmatch $($patternTagValues.$item.value)) {
+                $badValue = $true
+              }
+            }
+            "string"
+            {
+              if ($($tagsValueToCheck[$key]) -cne $($patternTagValues.$item.value)) {
+                $badValue = $true
+              }
+            }
+          }
+          if ($badValue) {
+            $nbOfBadValue += 1
+            $badTagValue.Add($key,$($patternTagValues.$item.errorMessage))
+          }
+          # exit from the foreach loop
+          $itemFound = $true
+          break
+        }
+      }
+      if (-not $itemFound) {
+        if ([string]::IsNullOrEmpty($($tagsValueToCheck[$key]).Trim())) {
+          $nbOfBadValue += 1
+          $badTagValue.Add($key,"undefined")
+        }
+      }
+    }
+  }
+
+  if ($badTagValue.Count -eq 0) {
+    $badTagValue.Add("FinOps tag values","No Error detected")
+  }
+
+  # Convert hash array into Json
+  $badTagValueJson = $badTagValue | ConvertTo-Json -Compress
+
+  return $nbOfBadValue,$badTagValueJson
+}
+
 function GetSubscriptionTags
 {
    <#
     Retrieve pair Tag Name / Tag Value for subcriptions
     Input :
-      - $subscription: Object table of subscription for which tags must be sought
+      - $subscription : Object table of subscription for which tags must be sought
+      - $finOpsTags : List of FinOps tags defined
+      - $isValueChecked : Specify if the checking of value must be done
+      - $patternTagValues : patterns defined in the json file parameter
     Output:
       - Object Table with pair Tag Name / Tag Value
   #>
   param(
     [Object[]]$subscription,
-    [Array]$finOpsTags
+    [Array]$finOpsTags,
+    [String]$isValueChecked,
+    [Object]$patternTagValues
   )
   
-  $tagsJson = ""
-  $tags = @{}
   $subscriptionTags = @()
   $listSubscriptionTags = @()
-  $listTags = @()
-  $status = "FinOps tags present"
-  $listMissingFinOpsTags = ""
-  $listTagsName = "{}"
+  $tags = @{}
+  $tagValues = @{}
+  $tagsValueToCheck = @{}
   $NumberOfMissingFinOpsTags = $finOpsTags.Count
-
+  $nbOfBadValue = -1
+  
   # Retrieve Tags for the subscription
   $listSubscriptionTags = (GetTags -subscriptionId $subscription.Id)
-  # If there is at least 1 tag
-  if ($listSubscriptionTags.Count -ne 0) {
+
+  if ($listSubscriptionTags.Count -gt 0) {
     # Store each tags (key/value) in $subscriptionTags
     foreach ($key in $listSubscriptionTags.keys) {
       # Add Tags to Hash array
       $tags.Add($key, $listSubscriptionTags[$key])
-      $listTags += $key
     }
-    # Check if FinOps tags are present
-    $listTags = $listTags | Sort-Object
-    $listTagsName = "{" + ($listTags -join ",") + "}"
-    $missingFinOpsTags,$nbOfMissingFinOpsTags,$listMissingFinOpsTags = (SearchFinOpsTags -listTags $listTags -finOpsTags $finOpsTags)
-    if ($missingFinOpsTags) {
-      # Some FinOps tags are missing
-      $status = "Missing FinOps tags"
-      $NumberOfMissingFinOpsTags = $nbOfMissingFinOpsTags
+    # Analysis of tags names
+    $statusTagNames,$numberOfMissingFinOpsTags,$listMissingFinOpsTags,$listTagNames,$tagsJson = (AnalyzeTagNames -tags $tags -finOpsTags $finOpsTags)
+    
+    # Analysis of Tag Values if there is at least 1 FinOps Tag declared
+    if ($NumberOfMissingFinOpsTags -lt $finOpsTags.Count -and $isValueChecked.ToUpper() -eq "Y") {
+      $tagsValueToCheck = $tags
+      # Remove from $tagsValueToCheck the FinOps tags not declared
+      foreach($listMissingFinOpsTag in $listMissingFinOpsTags) {
+        $tagsValueToCheck.Remove($listMissingFinOpsTag)
+      }
+      # execute the analysis
+      $nbOfBadValue,$badTagValueJson = (AnalyzeTagValues -tagsValueToCheck $tagsValueToCheck -finOpsTags $finOpsTags -patternTagValues $patternTagValues)
     }
     else {
-      # All FinOps Tags are present
-      $NumberOfMissingFinOpsTags = 0
+      $tagValues.Add("FinOps tag values", "No Checking")
+      # Convert hash array into Json
+      $badTagValueJson = $tagValues | ConvertTo-Json -Compress
     }
   }
-  # Store empty line
-  else{
-    $status = "No tags defined"
+  else {
+    $statusTagNames = "No tags defined"
     $tags.Add("Tag", "Empty")
+    $tagValues.Add("Tag", "Empty")
+    # Convert hash array into Json
+    $tagsJson = $tags | ConvertTo-Json -Compress
+    $badTagValueJson = $tagValues | ConvertTo-Json -Compress
   }
-  # Convert hash array into Json
-  $tagsJson = $tags | ConvertTo-Json -Compress
+  
   # Add to result object array
   $subscriptionTags += (
     SetObjResult @($subscription.Name, $subscription.Id, '', '', 'Subscription',
-    '', '', $status,
-    $NumberOfMissingFinOpsTags, $listMissingFinOpsTags, $listTagsName, $tagsJson)
+    '', '', $statusTagNames,
+    $numberOfMissingFinOpsTags, $listMissingFinOpsTags, $listTagNames, $nbOfBadValue, $badTagValueJson, $tagsJson)
   )
   return $subscriptionTags
 }
@@ -406,55 +562,64 @@ function GetResourceGroupTags
     Input :
       - $subscription: subscription of the resource Group
       - $resourceGroup: Object table that contains resource group informations for which tags must be sought
-      - $finOpsTags: List of FinOpsTags defined
+      - $finOpsTags : List of FinOps tags defined
+      - $isValueChecked : Specify if the checking of value must be done
+      - $patternTagValues : patterns defined in the json file parameter
     Output:
       - Object Table with pair Tag Name / Tag Value
   #>
   param(
     [Object[]]$subscription,
     [Object[]]$resourceGroup,
-    [Array]$finOpsTags
+    [Array]$finOpsTags,
+    [String]$isValueChecked,
+    [Object]$patternTagValues
   )
   
-  $tagsJson = ""
-  $tags = @{}
   $resourceGroupTags = @()
-  $listTags = @()
-  $status = "FinOps tags present"
-  $listMissingFinOpsTags = ""
-  $listTagsName = "{}"
+  $tags = @{}
+  $tagValues = @{}
+  $tagsValueToCheck = @{}
   $NumberOfMissingFinOpsTags = $finOpsTags.Count
-  
-  if ($resourceGroup.Tags.Count -ne 0) {
+  $nbOfBadValue = -1
+
+  if ($resourceGroup.Tags.Count -gt 0) {
     foreach ($key in $resourceGroup.Tags.keys) {
       $tags.Add($key, $resourceGroup.Tags[$key])
-      $listTags += $key
     }
-    # Check if FinOps tags are present
-    $listTags = $listTags | Sort-Object
-    $listTagsName = "{" + ($listTags -join ",") + "}"
-    $missingFinOpsTags,$nbOfMissingFinOpsTags,$listMissingFinOpsTags = (SearchFinOpsTags -listTags $listTags -finOpsTags $finOpsTags)
-    if ($missingFinOpsTags) {
-      # Some FinOps tags are missing
-      $status = "Missing FinOps tags"
-      $NumberOfMissingFinOpsTags = $nbOfMissingFinOpsTags
+
+    # Analysis of tags names
+    $statusTagNames,$numberOfMissingFinOpsTags,$listMissingFinOpsTags,$listTagNames,$tagsJson = (AnalyzeTagNames -tags $tags -finOpsTags $finOpsTags)
+
+    # Analysis of Tag Values if there is at least 1 FinOps Tag declared
+    if ($NumberOfMissingFinOpsTags -lt $finOpsTags.Count -and $isValueChecked.ToUpper() -eq "Y") {
+      $tagsValueToCheck = $tags
+      # Remove from $tagsValueToCheck the FinOps tags not declared
+      foreach($listMissingFinOpsTag in $listMissingFinOpsTags) {
+        $tagsValueToCheck.Remove($listMissingFinOpsTag)
+      }
+      # execute the analysis
+      $nbOfBadValue,$badTagValueJson = (AnalyzeTagValues -tagsValueToCheck $tagsValueToCheck -finOpsTags $finOpsTags -patternTagValues $patternTagValues)
     }
     else {
-      # All FinOps Tags are present
-      $NumberOfMissingFinOpsTags = 0
+      $tagValues.Add("FinOps tag values", "No Checking")
+      # Convert hash array into Json
+      $badTagValueJson = $tagValues | ConvertTo-Json -Compress
     }
   }
   else {
-    $status = "No tags defined"
+    $statusTagNames = "No tags defined"
     $tags.Add("Tag", "Empty")
+    $tagValues.Add("Tag", "Empty")
+    # Convert hash array into Json
+    $tagsJson = $tags | ConvertTo-Json -Compress
+    $badTagValueJson = $tagValues | ConvertTo-Json -Compress
   }
-  # Convert hash array into Json
-  $tagsJson = $tags | ConvertTo-Json -Compress
-  # Add to result object array
+  
   $resourceGroupTags += (
     SetObjResult @($subscription.Name, $subscription.Id, $resourceGroup.ResourceGroupName, '', 'Resource Group',
-    $resourceGroup.ResourceId, $resourceGroup.Location, $status,
-    $NumberOfMissingFinOpsTags, $listMissingFinOpsTags, $listTagsName, $tagsJson)
+    $resourceGroup.ResourceId, $resourceGroup.Location, $statusTagNames,
+    $numberOfMissingFinOpsTags, $listMissingFinOpsTags, $listTagNames, $nbOfBadValue, $badTagValueJson, $tagsJson)
   )
   return $resourceGroupTags
 }
@@ -467,7 +632,9 @@ function GetResourceTags
       - $subscription: Subscription of the resource group
       - $resourceGroupName: Resource Group name of resource
       - $resource: Object that contains resource informations for which tags must be sought
-      - $finOpsTags: List of FinOpsTags defined
+      - $finOpsTags : List of FinOps tags defined
+      - $isValueChecked : Specify if the checking of value must be done
+      - $patternTagValues : patterns defined in the json file parameter
     Output:
       - Object Table with pair Tag Name / Tag Value
   #>
@@ -475,48 +642,56 @@ function GetResourceTags
     [Object[]]$subscription,
     [String]$resourceGroupName,
     [Object[]]$resource,
-    [Array]$finOpsTags
+    [Array]$finOpsTags,
+    [String]$isValueChecked,
+    [Object]$patternTagValues
   )
   
-  $tagsJson = ""
-  $tags = @{}
   $resourceTags = @()
-  $listTags = @()
-  $status = "FinOps tags present"
-  $listMissingFinOpsTags = ""
-  $listTagsName = "{}"
+  $tags = @{}
+  $tagValues = @{}
+  $tagsValueToCheck = @{}
   $NumberOfMissingFinOpsTags = $finOpsTags.Count
+  $nbOfBadValue = -1
 
-  if ($resource.Tags.Count -ne 0) {
+  if ($resource.Tags.Count -gt 0) {
     foreach ($key in $resource.Tags.keys) {
       $tags.Add($key, $resource.Tags[$key])
-      $listTags += $key
     }
-    # Check if FinOps tags are present
-    $listTags = $listTags | Sort-Object
-    $listTagsName = "{" + ($listTags -join ",") + "}"
-    $missingFinOpsTags,$nbOfMissingFinOpsTags,$listMissingFinOpsTags = (SearchFinOpsTags -listTags $listTags -finOpsTags $finOpsTags)
-    if ($missingFinOpsTags) {
-      # Some FinOps tags are missing
-      $status = "Missing FinOps tags"
-      $NumberOfMissingFinOpsTags = $nbOfMissingFinOpsTags
+
+    # Analysis of tags names
+    $statusTagNames,$numberOfMissingFinOpsTags,$listMissingFinOpsTags,$listTagNames,$tagsJson = (AnalyzeTagNames -tags $tags -finOpsTags $finOpsTags)
+
+    # Analysis of Tag Values if there is at least 1 FinOps Tag declared
+    if ($NumberOfMissingFinOpsTags -lt $finOpsTags.Count -and $isValueChecked.ToUpper() -eq "Y") {
+      $tagsValueToCheck = $tags
+      # Remove from $tagsValueToCheck the FinOps tags not declared
+      foreach($listMissingFinOpsTag in $listMissingFinOpsTags) {
+        $tagsValueToCheck.Remove($listMissingFinOpsTag)
+      }
+      # execute the analysis
+      $nbOfBadValue,$badTagValueJson = (AnalyzeTagValues -tagsValueToCheck $tagsValueToCheck -finOpsTags $finOpsTags -patternTagValues $patternTagValues)
     }
     else {
-      # All FinOps Tags are present
-      $NumberOfMissingFinOpsTags = 0
+      $tagValues.Add("FinOps tag values", "No Checking")
+      # Convert hash array into Json
+      $badTagValueJson = $tagValues | ConvertTo-Json -Compress
     }
   }
-  else{
-    $status = "No tags defined"
+  else {
+    $statusTagNames = "No tags defined"
     $tags.Add("Tag", "Empty")
+    $tagValues.Add("Tag", "Empty")
+    # Convert hash array into Json
+    $tagsJson = $tags | ConvertTo-Json -Compress
+    $badTagValueJson = $tagValues | ConvertTo-Json -Compress
   }
-  # Convert hash array into Json
-  $tagsJson = $tags | ConvertTo-Json -Compress
+
   # Add to result object array
   $resourceTags += SetObjResult @(
     $subscription.Name, $subscription.Id, $resourceGroupName, $resource.Name, $resource.ResourceType,
-    $resource.ResourceId, $resource.Location, $status,
-    $NumberOfMissingFinOpsTags, $listMissingFinOpsTags, $listTagsName, $tagsJson
+    $resource.ResourceId, $resource.Location, $statusTagNames,
+    $numberOfMissingFinOpsTags, $listMissingFinOpsTags, $listTagNames, $nbOfBadValue, $badTagValueJson, $tagsJson
   )
   return $resourceTags
 }
@@ -562,7 +737,7 @@ if ($subscriptions.Count -ne 0) {
     Write-Verbose "- Processing of the $($subscription.Name) subscription."
     Set-AzContext -Subscription $subscription.Id
     # Retrieve subscription tags and write in result file
-    $arrayTags = (GetSubscriptionTags -subscription $subscription -finOpsTags $finOpsTags)
+    $arrayTags = (GetSubscriptionTags -subscription $subscription -finOpsTags $finOpsTags -isValueChecked $globalVar.tagCheckValue -patternTagValues $globalVar.patternTagValues)
     $arrayTags | Export-Csv -Path $csvFileResult -Delimiter ";" -NoTypeInformation -Append
 
     <# ------------
@@ -580,7 +755,7 @@ if ($subscriptions.Count -ne 0) {
       foreach ($resourceGroup in $resourceGroups) {
         $arrayTags = @()
         # Retrieve resource group Tags and write in result file
-        $arrayTags = (GetResourceGroupTags -subscription $subscription -ResourceGroup $resourceGroup -finOpsTags $finOpsTags)
+        $arrayTags = (GetResourceGroupTags -subscription $subscription -ResourceGroup $resourceGroup -finOpsTags $finOpsTags -isValueChecked $globalVar.tagCheckValue -patternTagValues $globalVar.patternTagValues)
         $arrayTags | Export-Csv -Path $csvFileResult -Delimiter ";" -NoTypeInformation -Append
         <# ------------
           Resources processing
@@ -598,7 +773,7 @@ if ($subscriptions.Count -ne 0) {
           $arrayTags = @()
           $countResource = 0
           foreach ($resource in $resources) {
-            $arrayTags += (GetResourceTags -subscription $subscription -resourceGroupName $resourceGroup.ResourceGroupName -resource $resource -finOpsTags $finOpsTags)
+            $arrayTags += (GetResourceTags -subscription $subscription -resourceGroupName $resourceGroup.ResourceGroupName -resource $resource -finOpsTags $finOpsTags -isValueChecked $globalVar.tagCheckValue -patternTagValues $globalVar.patternTagValues)
             $countResource += 1
             # if number of resources = SaveEvery in json file parameter, write in the result file and re-initiate the array and counter
             if ($countResource -eq $globalVar.saveEvery) {
