@@ -38,7 +38,7 @@
   
   For more information, type Get-Help .\Get-AzAhb.ps1 [-detailed | -full]
 
-  Global variables are stored in .\GetAzAhb.json and must be adapted accordingly
+  Global variables are stored in .\Get-AzAhb.json and must be adapted accordingly
 #>
 
 <# -----------

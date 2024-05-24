@@ -1,0 +1,12 @@
+{
+  "pathResult": "C:/Users/fparment/Documents/AzFinOps/Data/GetAzDiskInfo/",
+  "fileResult": "GetAzDiskInfo",
+  "chronoFile": "N",
+  "generateLogFile": "Y",
+  "checkIfLogIn": "Y",
+  "subscriptionsScope": {
+    "scope": "C:/Users/fparment/Documents/AzFinOps/Data/Alstom/subscriptions.csv",
+    "delimiter": ";"
+  },
+  "saveEvery": 100
+}

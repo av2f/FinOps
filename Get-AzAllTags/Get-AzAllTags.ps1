@@ -7,7 +7,7 @@
   Retrieve Tags defined in Subscriptions, Resource Groups and Resources, and store them in 
   .\GetAzAllTags\GetAzAllTags[mmddyyyyhhmmss].csv
   For more information, type Get-Help .\Get-AzAllTags.ps1 [-detailed | -full]
-  Global variables are stored in .\GetAzAllTags.json and must be adapted accordingly
+  Global variables are stored in .\Get-AzAllTags.json and must be adapted accordingly
 #>
 
 <# -----------
@@ -24,7 +24,7 @@ Set-Item -Path Env:\SuppressAzurePowerShellBreakingChangeWarnings -Value $true
   Declare global variables, arrays and objects
 ----------- #>
 # Retrieve global variables from json file
-$globalVar = Get-Content -Raw -Path ".\GetAzAllTags.json" | ConvertFrom-Json
+$globalVar = Get-Content -Raw -Path ".\Get-AzAllTags.json" | ConvertFrom-Json
 #
 $globalChronoFile = (Get-Date -Format "MMddyyyyHHmmss") # Format for file with chrono
 $globalLog = $false # set to $true if generateLogFile in json file is set to "Y"
@@ -751,7 +751,7 @@ if ($subscriptions.Count -ne 0) {
     if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: $($resourceGroupsCount) Resource Groups found") }
     Write-Verbose "-- $($resourceGroupsCount) Resource Groups found"
     
-    if ($resourceGroupsCount -ne 0) {
+    if ($resourceGroupsCount -gt 0) {
       foreach ($resourceGroup in $resourceGroups) {
         $arrayTags = @()
         # Retrieve resource group Tags and write in result file
