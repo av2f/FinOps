@@ -19,6 +19,8 @@ Build a .csv file that contains for each Windows VMs:
   - License Type: 
     - if "Windows_Server" then AHB is applied
     - if "Windows_Client" then Azure Virtual Desktop is applied
+  - Image Offer
+  - Image Publisher
   - Size of VM
   - Number of Cores of VMs
   - RAM of VMs
@@ -70,6 +72,15 @@ Global variables are stored in .\GetAzAhb.json and must be adapted accordingly:
   },
   "saveEvery": 100                            # Specify a batch of how many records to write to the result file
 }
+
+** Usage **
+Prerequisites:
+- Module az* must be installed : https://learn.microsoft.com/en-us/powershell/azure/install-azps-windows?view=azps-12.0.0&tabs=powershell&pivots=windows-psgallery
+- Prior running the script, you must connect to Azure with the command : Connect-AzAccount
+
+- Ensure to set up correctly the Json parameter file
+
+- Running the script : type the command ".\Az-Ahb.ps1
 
 ** Updates **
 Updated date  : 04-17-2024
