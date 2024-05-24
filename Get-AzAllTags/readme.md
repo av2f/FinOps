@@ -37,7 +37,19 @@ Update done   :
   + NbOfMissingFinOpsTags: number of FinOps tags which are not defined
   + MissingFinOpsTags: List of missing FinOps tags
   + TagsNameDefined: List of tags name defined
+  + NbOfBadValue: From the declared FinOps Tags presents, give the number of tags that have a bad value
+    The -1 value means there was no checking (typically when no FinOps tags declared)
+  + BadValueFinOpsTags: indicates the tags with bad values
   + TagsDefined: list of Tags defined with name and value in Json format
+
+** Usage **
+Prerequisites:
+- Module az* must be installed : https://learn.microsoft.com/en-us/powershell/azure/install-azps-windows?view=azps-12.0.0&tabs=powershell&pivots=windows-psgallery
+- Prior running the script, you must connect to Azure with the command : Connect-AzAccount
+
+- Ensure to set up correctly the Json parameter file
+
+- Running the script : type the command ".\Az-AllTags.ps1
 
   ** Updates **
 Updated date  : 05-17-2024
