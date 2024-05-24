@@ -382,6 +382,25 @@ function GetVmImage
   return $errorCount,$vmImage
 }
 
+function GetOsName
+{
+  param(
+    [String]$imagePublisher
+  )
+
+  $osName = "Undefined"
+  if (-not [string]::IsNullOrEmpty($imagePublisher)) {
+    switch ($imagePublisher)
+    {
+      "microsoftsqlserver" { $osName = "Windows Server" }
+      "MicrosoftWindowsServer" { $osName = "Windows Server" }
+      "MicrosoftWindowsDesktop" { $osName = "Windows Desktop" }
+    }
+  }
+
+  return $osName
+}
+
 function GetVmSizing
 {
   <#
@@ -660,6 +679,10 @@ if ($subscriptions.Count -ne 0) {
           GetAvgMemUsage -ResourceId $vm.Id -metric $globalVar.metrics.memoryAvailable -retentionDays $globalVar.metrics.retentionDays -vmMemory $vmSizing.MemoryInMB -timeGrain $timeGrain
         )
         $globalError += $errorCount
+        # -- Try to define OS if $vm.OsName is empty
+        if ([string]::IsNullOrEmpty($vm.OsName)) {
+          $vm.OsName = (GetOsName -imagePublisher $vmImage.Publisher)
+        }
         # Aggregate informations
         $arrayVm += SetObjResult @(
           $subscription.Name, $subscription.Id, $vm.ResourceGroupName,
