@@ -550,7 +550,7 @@ if ($subscriptions.Count -ne 0) {
     # Set the context to use the specified subscription
     if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Processing of the $($subscription.Name) subscription.") }
     Write-Verbose "- Processing of the $($subscription.Name) subscription."
-    Set-AzContext -Subscription $subscription.Id
+    Set-AzContext -Subscription $subscription.Id | Out-Null
     if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Processing of Vms from Subscription $($subscription.Name)") }
     Write-Verbose "-- Processing of Vms from Subscription $($subscription.Name)"
     $countVm = 0

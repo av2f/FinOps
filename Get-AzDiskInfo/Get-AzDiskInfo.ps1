@@ -206,11 +206,29 @@ function GetDiskInfo {
     Input :
       - $resourceGroupName: Object table parameter subscriptionsScope in Json parameter file
     Output :
-      - Object Table with Subscription Name and Subscription Id
+      - $errorCount: Nb of errors detected
+      - $listDisks: array of results
   #>
   param (
     [string]$resourceGroupName
   )
+
+  $listDisks = @()
+  $errorCount = 0
+
+  # Retrieve Disks from $resourceGroupName with informations
+  try {
+    $listDisks = (Get-AzDisk -ResourceGroupName $resourceGroupName |
+    Select-Object -Property ManagedBy, @{l="SkuName";e={$_.Sku.Name}}, @{l="SkuTier";e={$_.Sku.Tier}},
+    TimeCreated, DiskSizeGB, DiskIOPSReadWrite, DiskMBpsReadWrite, DiskState, Name, Location)
+  }
+  catch {
+    Write-Host "An error occured retrieving Disks from ResourceGroup $resourceGroupName"
+    if ($globalLog) { (WriteLog -fileName $logfile -message "ERROR: An error occured retrieving Disks from ResourceGroup $resourceGroupName") }
+    $listDisks = @('Error', 'Error', 'Error', 'Error','Error', 'Error', 'Error', 'Error','Error', 'Error')
+    $errorCount += 1
+  }
+  return $errorCount, $listDisks
 }
 
 function SetObjResult {
@@ -222,8 +240,8 @@ function SetObjResult {
   param(
     [array]$listResult
   )
-  if ($listResult.Count -ne 12) {
-    $listResult = @('-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-')
+  if ($listResult.Count -ne 13) {
+    $listResult = @('-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-')
   }
   $objTagResult = @(
     [PSCustomObject]@{
@@ -239,6 +257,7 @@ function SetObjResult {
       Size_In_GB = $listResult[9]
       IOPSReadWrite = $listResult[10]
       MBpsReadWrite = $listResult[11]
+      Managed_By = $listResult[12]
     }
   )
   return $objTagResult
@@ -268,13 +287,13 @@ $subscriptions = (GetSubscriptions -scope $globalVar.subscriptionsScope)
 # --
 Write-Verbose "$($subscriptions.Count) subscriptions found."
 if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: $($subscriptions.Count) subscriptions found.") }
-if ($subscriptions.Count -ne 0) {
+if ($subscriptions.Count -gt 0) {
   foreach ($subscription in $subscriptions) {
     <# ------------
       Subscription processing
     ------------ #>
     # Set the context to use the specified subscription
-    Set-AzContext -Subscription $subscription.Id
+    Set-AzContext -Subscription $subscription.Id | Out-Null
     if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Processing of the $($subscription.Name) subscription.") }
     Write-Verbose "- Processing of the $($subscription.Name) subscription."
     $countDisk = 0
@@ -291,32 +310,38 @@ if ($subscriptions.Count -ne 0) {
     Write-Verbose "-- $($resourceGroupsCount) Resource Groups found"
     if ($resourceGroupsCount -gt 0) {
       foreach ($resourceGroup in $resourceGroups) {
-
-    
-        # Aggregate informations
-        $arrayDisk += SetObjResult @(
-          $subscription.Name, $subscription.Id, $resourceGroup.ResourceGroupName,
-          <#
-          $vm.Name, $vm.Id, $vm.VmId, $vm.Location, $vm.PowerState,
-          $vm.OsType, $vm.OsName, $vm.VmSize,
-          $vmSizing.NumberOfCores, $vmSizing.MemoryInMB,
-          $avgPercentCpu['average'], $avgPercentCpu['maxReached'], $avgPercentCpu['minReached'], $avgPercentCpu['countLimitReached'],
-          $avgPercentMem['average'], $avgPercentMem['maxReached'], $avgPercentMem['minReached'], $avgPercentMem['countLimitReached']
-          #>
-        )
-        $diskTotal += 1
-        $countDisk += 1
-        # if number of resources = SaveEvery in json file parameter, write in the result file and re-initiate the array and counter
-        if ($countDisk -eq $globalVar.saveEvery) {
-          $arrayDisk | Export-Csv -Path $csvResFile -Delimiter ";" -NoTypeInformation -Append
-          $arrayDisk = @()
-          $countDisk = 0
+        if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Processing of Resource Group $($resourceGroup.ResouceGroupName))") }
+        Write-Verbose "-- Processing of Resource Group $($resourceGroup.ResouceGroupName)"
+        $errorCount, $disks = (GetDiskInfo -resourceGroupName $resourceGroup.ResouceGroupName)
+        $globalError += $errorCount
+        $diskCount = $disks | Measure-Object | ForEach-Object Count
+        # if at least a disk
+        if ($diskCount -gt 0) {
+          foreach ($disk in $disks) {
+            if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: $($diskCount) disks found") }
+            Write-Verbose "-- $($diskCount) disks found"
+            # Aggregate informations
+            $arrayDisk += SetObjResult @(
+              $subscription.Name, $subscription.Id, $resourceGroup.ResourceGroupName,
+              $disk.Name, $disk.Location, $disk.DiskState, $disk.TimeCreated,
+              $disk.SkuName, $disk.SkuTier, $disk.DiskSizeGB, $disk.DiskIOPSReadWrite,
+              $disk.DiskMBpsReadWrite, $disk.ManagedBy
+            )
+            $diskTotal += 1
+            $countDisk += 1
+            # if number of resources = SaveEvery in json file parameter, write in the result file and re-initiate the array and counter
+            if ($countDisk -eq $globalVar.saveEvery) {
+              $arrayDisk | Export-Csv -Path $csvResFile -Delimiter ";" -NoTypeInformation -Append
+              $arrayDisk = @()
+              $countDisk = 0
+            }
+          }
         }
       }
       # Write last Disks
       if ($countDisk -gt 0) { $arrayDisk | Export-Csv -Path $csvResFile -Delimiter ";" -NoTypeInformation -Append }
       if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: $diskTotal disks found and processed") }
-      Write-Verbose "--- $diskTotal VMs found and processed"
+      Write-Verbose "--- $diskTotal disks found and processed"
     }
     Write-Verbose "---------------------------------------------"
   }

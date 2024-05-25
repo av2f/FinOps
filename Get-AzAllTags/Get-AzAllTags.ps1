@@ -735,7 +735,7 @@ if ($subscriptions.Count -ne 0) {
     # Set the context to use the specified subscription
     if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Processing of the $($subscription.Name) subscription.") }
     Write-Verbose "- Processing of the $($subscription.Name) subscription."
-    Set-AzContext -Subscription $subscription.Id
+    Set-AzContext -Subscription $subscription.Id | Out-Null
     # Retrieve subscription tags and write in result file
     $arrayTags = (GetSubscriptionTags -subscription $subscription -finOpsTags $finOpsTags -isValueChecked $globalVar.tagCheckValue -patternTagValues $globalVar.patternTagValues)
     $arrayTags | Export-Csv -Path $csvFileResult -Delimiter ";" -NoTypeInformation -Append
