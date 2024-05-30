@@ -361,11 +361,13 @@ function GetPercentCpuUsage
   # Define Start and End dates
   $startTime = (Get-Date).AddDays(-$retentionDays)
   $endTime = (Get-Date)
-
+    
   # if $retentionDays > 30 days, set up to 30 days
+  <#
   if ($retentionDays -gt 30) {
     $retentionDays = 30
   }
+  #>
 
   # Retrieve Average CPU usage in percentage
   $avgCpus = (
@@ -434,11 +436,12 @@ function GetPercentMemUsage
     $startTime = (Get-Date).AddDays(-$retentionDays)
     $endTime = (Get-Date)
 
-  
     # if $retentionDays > 30 days, set up to 30 days
+    <#
     if ($retentionDays -gt 30) {
       $retentionDays = 30
     }
+    #>
 
     # Retrieve Average of available RAM in Bytes
     $avgAvailableMems = (

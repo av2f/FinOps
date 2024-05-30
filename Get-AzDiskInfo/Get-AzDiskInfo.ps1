@@ -310,9 +310,9 @@ if ($subscriptions.Count -gt 0) {
     Write-Verbose "-- $($resourceGroupsCount) Resource Groups found"
     if ($resourceGroupsCount -gt 0) {
       foreach ($resourceGroup in $resourceGroups) {
-        if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Processing of Resource Group $($resourceGroup.ResouceGroupName))") }
+        if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Processing of Resource Group $($resourceGroup.ResourceGroupName)") }
         Write-Verbose "-- Processing of Resource Group $($resourceGroup.ResouceGroupName)"
-        $errorCount, $disks = (GetDiskInfo -resourceGroupName $resourceGroup.ResouceGroupName)
+        $errorCount, $disks = (GetDiskInfo -resourceGroupName $resourceGroup.ResourceGroupName)
         $globalError += $errorCount
         $diskCount = $disks | Measure-Object | ForEach-Object Count
         # if at least a disk

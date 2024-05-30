@@ -1,7 +1,7 @@
 {
   "pathResult": "C:/Users/fparment/Documents/AzFinOps/Data/GetAzVmUsage/",
   "fileResult": "GetAzVmUsage",
-  "chronoFile": "N",
+  "chronoFile": "Y",
   "generateLogFile": "Y",
   "checkIfLogIn": "Y",
   "subscriptionsScope": {
@@ -12,9 +12,9 @@
     "cpuUsage": "Percentage CPU",
     "memoryAvailable": "Available Memory Bytes",
     "retentionDays": 30,
-    "timeGrain": "01:00:00"
+    "timeGrain": "00:30:00"
   },
-  "limitCountCpu": 50,
-  "limitCountMem": 50,
-  "saveEvery": 100
+  "limitCountCpu": 40,
+  "limitCountMem": 40,
+  "saveEvery": 40
 }
