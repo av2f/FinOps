@@ -1,10 +1,10 @@
 <#
-  Name    : Get-AzVmUsage.ps1
+  Name    : Get-AzVmUsageRi.ps1
   Author  : Frederic Parmentier
-  Version : 1.1.1
-  Creation Date : 04/10/2024
+  Version : 1.0
+  Creation Date : 06/06/2024
                    
-  Retrieve CPU and RAM usage for all VMs in subscriptions scope defined
+  Retrieve CPU usage for all VMs in subscriptions scope defined
 
   Build a .csv file that contains for each Windows VMs:
   - Subscription Name
@@ -22,17 +22,14 @@
       + Average CPU usage in percentage
       + Max CPU usage in percentage
       + Min CPU usage in percentage
-  
-    - RAM
-      + Average RAM usage in percentage
-      + Max RAM usage in percentage
-      + Min RAM usage in percentage
 
-      in result file GetAzVmUsage[mmddyyyyhhmmss].csv
-  
-  For more information, type Get-Help .\Get-AzVmUsage.ps1 [-detailed | -full]
+      in result file GetAzVmUsageRi[mmddyyyyhhmmss].csv
 
-  Global variables are stored in .\GetAzVmUsage.json and must be adapted accordingly
+  + Create the file Instances[mmddyyyyhhmmss].csv with 1 column containing VM Size
+  
+  For more information, type Get-Help .\Get-AzVmUsageRi.ps1 [-detailed | -full]
+
+  Global variables are stored in .\Get-AzVmUsageRi.json and must be adapted accordingly
 #>
 
 <# -----------
@@ -49,7 +46,7 @@ Set-Item -Path Env:\SuppressAzurePowerShellBreakingChangeWarnings -Value $true
   Declare global variables, arrays and objects
 ----------- #>
 # Retrieve global variables from json file
-$globalVar = Get-Content -Raw -Path "$($PSScriptRoot)\Get-AzVmUsage.json" | ConvertFrom-Json
+$globalVar = Get-Content -Raw -Path "$($PSScriptRoot)\Get-AzVmUsageRi.json" | ConvertFrom-Json
 #
 $globalError = 0  # to count errors
 $globalChronoFile = (Get-Date -Format "MMddyyyyHHmmss") # Format for file with chrono
@@ -488,10 +485,10 @@ function SetObjResult {
   param(
     [array]$listResult
   )
-  if ($listResult.Count -ne 22) {
-    $listResult = @('-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-','-','-','-','-','-','-','-','-')
+  if ($listResult.Count -ne 18) {
+    $listResult = @('-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-','-','-','-','-')
   }
-  $objTagResult = @(
+  $objResult = @(
     [PSCustomObject]@{
       Subscription = $listResult[0]
       ResourceGroup = $listResult[1]
@@ -511,22 +508,39 @@ function SetObjResult {
       Max_CPU_Usage_Percent = $listResult[15]
       Min_CPU_Usage_Percent = $listResult[16]
       Limit_Count_CPU = $listResult[17]
-      Avg_Mem_Usage_Percent = $listResult[18]
-      Max_Mem_Usage_Percent = $listResult[19]
-      Min_Mem_Usage_Percent = $listResult[20]
-      Limit_Count_Mem = $listResult[21]
     }
   )
-  return $objTagResult
+  return $objResult
+}
+
+function SetObjInstance {
+  <#
+    Create Object array with informations contained in the array $listInstance
+    Input: $listInstance
+    Output: Object array with informations
+  #>
+  param(
+    [array]$listInstance
+  )
+  if ($listInstance.Count -ne 1) {
+    $listInstance = @('-')
+  }
+  $objInstance = @(
+    [PSCustomObject]@{
+      Instance = $listInstance[0]
+    }
+  )
+  return $objInstance
 }
 #
 <# ------------------------------------------------------------------------
 Main Program
 --------------------------------------------------------------------------- #>
-# Create directory results if not exists and filename for results
+# Create directory results if not exists and filenames for results
 if ((CreateDirectoryResult $globalVar.pathResult)) {
   # Create the CSV file result
   $csvResFile = (CreateFile -pathName $globalVar.pathResult -fileName $globalVar.fileResult -extension 'csv' -chrono $globalVar.chronoFile)
+  $csvInstanceFile = (CreateFile -pathName $globalVar.pathResult -fileName $globalVar.fileInstance -extension 'csv' -chrono $globalVar.chronoFile)
   # if generateLogFile in Json file is set to "Y", create log file
   if ($globalVar.generateLogFile.ToUpper() -eq "Y") {
     # Create log file
@@ -560,6 +574,8 @@ if ($subscriptions.Count -ne 0) {
     Write-Verbose "-- Processing of Vms from Subscription $($subscription.Name)"
     $countVm = 0
     $arrayVm = @()
+    $countInstance = 0
+    $arrayInstance = @()
     $errorCount, $vms = (GetVmInfoFromSubscription -subscriptionId $subscription.Id)
     $globalError += $errorCount
     # Continue if there are Virtual Machines
@@ -574,10 +590,12 @@ if ($subscriptions.Count -ne 0) {
         $avgPercentCpu = (
           GetPercentCpuUsage -resourceId $vm.Id -metric $globalVar.metrics.cpuUsage -retentionDays $globalVar.metrics.retentionDays -timeGrain $timeGrain -limitCpu $globalVar.limitCountCpu
         )
+        <#
         # -- Calculate Memory usage in percentage
         $avgPercentMem = (
           GetPercentMemUsage -ResourceId $vm.Id -metric $globalVar.metrics.memoryAvailable -retentionDays $globalVar.metrics.retentionDays -vmMemory $vmSizing.MemoryInMB -timeGrain $timeGrain -limitMem $globalVar.limitCountMem
         )
+        #>
         # Aggregate informations
         $startDate = "{0:MM/dd/yyyy}" -f (Get-Date).AddDays(-$globalVar.metrics.retentionDays)
         $endDate = (Get-Date -Format "MM/dd/yyyy")
@@ -587,27 +605,61 @@ if ($subscriptions.Count -ne 0) {
           $vm.Name, $vm.Id, $vm.VmId, $vm.Location, $vm.PowerState,
           $vm.OsType, $vm.OsName, $vm.VmSize,
           $vmSizing.NumberOfCores, $vmSizing.MemoryInMB, $startDate, $endDate
-          $avgPercentCpu['average'], $avgPercentCpu['maxReached'], $avgPercentCpu['minReached'], $avgPercentCpu['countLimitReached'],
-          $avgPercentMem['average'], $avgPercentMem['maxReached'], $avgPercentMem['minReached'], $avgPercentMem['countLimitReached']
+          $avgPercentCpu['average'], $avgPercentCpu['maxReached'], $avgPercentCpu['minReached'], $avgPercentCpu['countLimitReached']
         )
-        $vmTotal += 1
         $countVm += 1
+        $vmTotal += 1
+        # if VM is in running state, store the VM size in the csv instance file
+        if ($vm.PowerState -eq "VM running") {
+          $arrayInstance += SetObjInstance @($vm.VmSize)
+          $countInstance += 1
+        }
         # if number of resources = SaveEvery in json file parameter, write in the result file and re-initiate the array and counter
         if ($countVm -eq $globalVar.saveEvery) {
           $arrayVm | Export-Csv -Path $csvResFile -Delimiter ";" -NoTypeInformation -Append
           $arrayVm = @()
           $countVm = 0
         }
+        if ($countInstance -eq $globalVar.saveEvery) {
+          $arrayInstance | Export-Csv -Path $csvInstanceFile -Delimiter ";" -NoTypeInformation -Append
+          $arrayInstance = @()
+          $countInstance = 0
+        }
       }
       # Write last Vms
       if ($countVm -gt 0) { $arrayVm | Export-Csv -Path $csvResFile -Delimiter ";" -NoTypeInformation -Append }
+      if ($countInstance -gt 0) { $arrayInstance | Export-Csv -Path $csvInstanceFile -Delimiter ";" -NoTypeInformation -Append }
+      
       if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: $vmTotal VMs found and processed") }
       Write-Verbose "--- $vmTotal VMs found and processed"
     }
     Write-Verbose "---------------------------------------------"
   }
-  if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: File $csvResFile is available.") }
+  # Execute script to add instances from reservedinstances.csv in Instances[mmddyyyyhhmmss].csv
+  if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Add instances from reservedinstances.csv file in csv instances file") }
+  Write-Verbose "Add instances from reservedinstances.csv file in csv instances file"
+  if (Test-Path -Path $globalVar.reservedInstance.sourceFile -PathType Leaf) {
+    # if source file exists, run the script
+    & $PSScriptRoot\Get-AzInstanceRi.ps1
+    if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Instances added in csv instances file") }
+    Write-Verbose "Instances added in csv instances file"
+  }
+  else {
+    if ($globalLog) {
+      (WriteLog -fileName $logfile -message "ERROR: the file $($globalVar.reservedInstance.sourceFile) does not exist")
+      (WriteLog -fileName $logfile -message "ERROR: Cannot retrieve instances from Reserved instances")
+    }
+    Write-Verbose "ERROR: the file $($globalVar.reservedInstance.sourceFile) does not exist"
+    Write-Verbose "ERROR: Cannot retrieve instances from Reserved instances"
+    $globalError =+ 1
+  }
+  
+  if ($globalLog) {
+    (WriteLog -fileName $logfile -message "INFO: File $csvResFile is available.")
+    (WriteLog -fileName $logfile -message "INFO: File $csvInstanceFile is available.")
+  }
   Write-Verbose "File $csvResFile is available."
+  Write-Verbose "File $csvInstanceFile is available."
 }
 else {
   if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: No Subscriptions enabled found.") }

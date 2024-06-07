@@ -5,16 +5,16 @@
   "generateLogFile": "Y",
   "checkIfLogIn": "Y",
   "subscriptionsScope": {
-    "scope": "All",
+    "scope": "C:/Users/fparment/Documents/AzFinOps/Data/Alstom/subscriptions.csv",
     "delimiter": ";"
   },
   "metrics": {
     "cpuUsage": "Percentage CPU",
     "memoryAvailable": "Available Memory Bytes",
     "retentionDays": 30,
-    "timeGrain": "01:00:00"
+    "timeGrain": "00:30:00"
   },
-  "limitCountCpu": 0,
-  "limitCountMem": 0,
+  "limitCountCpu": 40,
+  "limitCountMem": 40,
   "saveEvery": 40
 }
