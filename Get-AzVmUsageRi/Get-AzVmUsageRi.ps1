@@ -322,6 +322,39 @@ function GetVmSizing
   return $errorCount,$resSizing
 }
 
+function GetVmScaleSets
+{
+  <#
+    Retrieve for ResourceGroup following VmScaleSet informations:
+    Sku Name, Sku Capacity, Unique Id, Id, Name and Location 
+    Input:
+      - $resourceGroupName: ResourceGroup Name
+    Output:
+      - $errorCount: Nb of errors detected
+      - $listVmScaleSets: array of results
+  #>
+
+  param(
+    [String]$resourceGroupName
+  )
+  
+  $listVmScaleSets = @()
+  $errorCount = 0
+
+  # Retrieve VMs from $subscriptionId with informations
+  try {
+    $listVmScaleSets = (Get-AzVmss -ResourceGroupName $resourceGroupName | Select-Object -Property @{l="Instance";e={$_.Sku.Name}}, @{l="Capacity";e={$_.Sku.Capacity}},
+    UniqueId, Id, Name, Location -ErrorAction SilentlyContinue)
+  }
+  catch {
+    Write-Host "An error occured retrieving VmScaleSets from ResourceGroup Name $resourceGroupName"
+    if ($globalLog) { (WriteLog -fileName $logfile -message "ERROR: An error occured retrieving VmScaleSets from ResourceGroup Name $resourceGroupName") }
+    $listVmScaleSets = @('Error', 'Error', 'Error', 'Error','Error', 'Error')
+    $errorCount += 1
+  }
+  return $errorCount,$listVmScaleSets
+}
+
 function GetPercentCpuUsage
 {
   <#
@@ -499,6 +532,9 @@ if ($subscriptions.Count -ne 0) {
     $arrayVm = @()
     $countInstance = 0
     $arrayInstance = @()
+    $arrayVmScaleSet = @()
+    $countVmScaleSet = 0
+
     $errorCount, $vms = (GetVmInfoFromSubscription -subscriptionId $subscription.Id)
     $globalError += $errorCount
     # Continue if there are Virtual Machines
@@ -528,11 +564,13 @@ if ($subscriptions.Count -ne 0) {
         )
         $countVm += 1
         $vmTotal += 1
-        # if VM is in running state, store the VM size in the csv instance file
-        if ($vm.PowerState -eq "VM running") {
-          $arrayInstance += SetObjInstance @($vm.VmSize)
-          $countInstance += 1
-        }
+
+        # Store the VM size in the csv instance file
+        # if ($vm.PowerState -eq "VM running") {
+        $arrayInstance += SetObjInstance @($vm.VmSize)
+        $countInstance += 1
+        # }
+
         # if number of resources = SaveEvery in json file parameter, write in the result file and re-initiate the array and counter
         if ($countVm -eq $globalVar.saveEvery) {
           $arrayVm | Export-Csv -Path $csvResFile -Delimiter ";" -NoTypeInformation -Append
@@ -552,6 +590,25 @@ if ($subscriptions.Count -ne 0) {
       if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: $vmTotal VMs found and processed") }
       Write-Verbose "--- $vmTotal VMs found and processed"
     }
+    # Retrieve VmScaleSets from the subscription
+    Write-Verbose "---------------------------------------------"
+    if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Search VmScaleSets from the Subscription $($subscription.Name)") }
+    Write-Verbose "--- Search VmScaleSets from the Subscription $($subscription.Name)"
+    $listResourceGroups = (Get-AzResourceGroup | Select-Object -Property ResourceGroupName)
+    if ($($listResourceGroups | Measure-Object | ForEach-Object count) -gt 0) {
+      foreach($resourceGroup in $listResourceGroups) {
+        if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Processing of the $($resourceGroup.ResourceGroupName) ResourceGroup") }
+        Write-Verbose "--- Processing of the $($resourceGroup.ResourceGroupName) ResourceGroup"
+        $errorCount, $vmScaleSets = (GetVmScaleSets -resourceGroupName $resourceGroup.ResourceGroupName)
+        if ($($vmScaleSets | Measure-Object | ForEach-Object count) -gt 0) {
+          foreach($vmScaleSet in $vmScaleSets) {
+            # Mettre dans arrayVmScaleSet
+            Write-Host $vmScaleSet.UniqueId " - " $vmScaleSet.Name " - " $vmScaleSet.Location " - " $vmScaleSet.Instance " - " $vmScaleSet.Capacity
+          }  
+        }
+      }
+    }
+
     Write-Verbose "---------------------------------------------"
   }
   # Execute script to add instances from reservedinstances.csv in Instances[mmddyyyyhhmmss].csv
