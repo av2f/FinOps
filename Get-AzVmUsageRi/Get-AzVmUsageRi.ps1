@@ -221,7 +221,7 @@ function GetSubscriptions
       $nbErrorSubscription = 0
       
       foreach ($subscription in $srcListSubscriptions) {
-        $GetSubscription = (Get-AzSubscription -SubscriptionId $subscription.Id -ErrorAction SilentlyContinue)
+        $GetSubscription = (Get-AzSubscription -SubscriptionId $subscription.Id | Select-Object -Property State -ErrorAction SilentlyContinue)
         # Subscription no longer exists or is disabled
         if (!$GetSubscription -or $GetSubscription.State -ne "Enabled") {
           Write-Verbose "the $($subscription.Name) no longer exists or is disabled"
@@ -335,6 +335,7 @@ function GetPercentCpuUsage
       - $metric: Metric to use to calculate
       - $retentionDays: Number of days to calculate the average. Limit max = 30 days
       - $timeGrain: Granularity of time
+      - $totalHours: Number of hours regarding the retention days (30 days = 720 hours)
       - $limitCpu: in percentage, to calculate the number of time this limit is reached
     Output:
       - $calcCpuUsage: Array with data calculated
@@ -343,6 +344,7 @@ function GetPercentCpuUsage
     [String]$resourceId,
     [String]$metric,
     [Int16]$retentionDays,
+    [Int16]$totalHours,
     [TimeSpan]$timeGrain,
     [Int16]$limitCpu
   )
@@ -353,19 +355,19 @@ function GetPercentCpuUsage
     maxReached = 0
     minReached = 100
     countLimitReached = 0
+    usage = 0
   }
   
   # Define Start and End dates
-  $startTime = (Get-Date).AddDays(-$retentionDays)
-  $endTime = (Get-Date)
-    
-  # if $retentionDays > 30 days, set up to 30 days
   <#
+  # if $retentionDays > 30 days, set up to 30 days
   if ($retentionDays -gt 30) {
     $retentionDays = 30
   }
   #>
-
+  $startTime = (Get-Date).AddDays(-$retentionDays)
+  $endTime = (Get-Date)
+    
   # Retrieve Average CPU usage in percentage
   $avgCpus = (
     Get-AzMetric -ResourceId $resourceId -MetricName $metric -StartTime $startTime -EndTime $endTime -AggregationType Average -TimeGrain $timeGrain |
@@ -385,95 +387,13 @@ function GetPercentCpuUsage
     }
     # Average processing
     $calcCpuUsage['average'] = [Math]::Round($calcCpuUsage['average']/$avgCpus.count,2)
+    # Usage
+    $calcCpuUsage['usage'] = $calcCpuUsage['countLimitReached']/$totalHours
   }
   # else all result from array = 0
   else { $calcCpuUsage['minReached'] = 0 }
   
   return $calcCpuUsage
-}
-
-function GetPercentMemUsage
-{
-  <#
-    Calculate in percentage for a resource Id and for a retention in days
-      - the Average Memory usage
-      - the Max Memory usage reached
-      - the Min Memory usage reached
-      - the number of time the limit is reached
-    Input:
-      - $resourceId: Resource Id to calculate RAM usage
-      - $metric: Metric to use to calculate
-      - $retentionDays: Number of days to calculate the average. Limit max = 30 days
-      - $vmMemory: RAM in MB of the VM the resource Id
-      - $timeGrain: Granularity of time
-    Output:
-      - $calcMemUsage: Array with data calculated
-  #>
-  param(
-    [String]$resourceId,
-    [String]$metric,
-    [Int16]$retentionDays,
-    [Int]$vmMemory,
-    [TimeSpan]$timeGrain,
-    [Int16]$limitMem
-  )
-  
-  # Initiate Result Array
-  $calcMemUsage = @{
-    average = 0
-    maxReached = 0
-    minReached = 100
-    countLimitReached = 0
-  }
-  
-  # Process if $vmMemory greater than 0
-  If ($vmMemory -gt 0) {
-    
-    # Define Start and End dates
-    $startTime = (Get-Date).AddDays(-$retentionDays)
-    $endTime = (Get-Date)
-
-    # if $retentionDays > 30 days, set up to 30 days
-    <#
-    if ($retentionDays -gt 30) {
-      $retentionDays = 30
-    }
-    #>
-
-    # Retrieve Average of available RAM in Bytes
-    $avgAvailableMems = (
-      Get-AzMetric -ResourceId $resourceId -MetricName $metric -StartTime $startTime -EndTime $endTime -AggregationType Average -TimeGrain $timeGrain |
-        ForEach-Object { $_.Data.Average } -ErrorAction SilentlyContinue
-    )
-    # If Metrics are available
-    if ($avgAvailableMems.count -gt 0) {
-      # Calculate Average of Memory usage in percentage
-      foreach ($avgAvailableMem in $avgAvailableMems) {
-        # if value is null, $avgAvailableMem = $vmMemory in Bytes
-        if ($null -eq $avgAvailableMem) {
-          $avgAvailableMem = $vmMemory * 1024 * 1024
-        }
-        # Convert in MB and in percentage
-        $avgAvailableMem = (($vmMemory - ($avgAvailableMem/(1024*1024))) * 100) / $vmMemory
-        # $avgMemUsage += (($vmMemory - ($avgAvailableMem/(1024*1024))) * 100) / $vmMemory
-        $calcMemUsage['average'] += [Math]::Round($avgAvailableMem,2)
-        # Max processing
-        if ([Math]::Round($avgAvailableMem,2) -gt $calcMemUsage['maxReached']) { $calcMemUsage['maxReached'] = [Math]::Round($avgAvailableMem,2) }
-        # Min Processing
-        if ([Math]::Round($avgAvailableMem,2) -lt $calcMemUsage['minReached']) { $calcMemUsage['minReached'] = [Math]::Round($avgAvailableMem,2) }
-        # Limit Processing
-        if ($avgAvailableMem -gt $limitMem) { $calcMemUsage['countLimitReached'] += 1 }
-      }
-      # Average processing
-      $calcMemUsage['average'] = [Math]::Round($calcMemUsage['average']/$avgAvailableMems.count,2)
-    }
-    # else all result from array = 0
-    else { $calcMemUsage['minReached'] = 0 }
-  }
-  # else all result from array = 0
-  else { $calcMemUsage['minReached'] = 0 }
-  
-  return $calcMemUsage
 }
 
 function SetObjResult {
@@ -485,29 +405,32 @@ function SetObjResult {
   param(
     [array]$listResult
   )
-  if ($listResult.Count -ne 18) {
-    $listResult = @('-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-','-','-','-','-')
+  if ($listResult.Count -ne 21) {
+    $listResult = @('-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-','-','-','-','-','-','-','-')
   }
   $objResult = @(
     [PSCustomObject]@{
       Subscription = $listResult[0]
       ResourceGroup = $listResult[1]
-      Vm_Name = $listResult[2]
+      Name = $listResult[2]
       Id = $listResult[3]
       Resource_Id = $listResult[4]
-      Location = $listResult[5]
-      PowerState = $listResult[6]
-      Os_Type = $listResult[7]
-      Os_Name = $listResult[8]
-      Size = $listResult[9]
-      Nb_Cores = $listResult[10]
-      Ram = $listResult[11]
-      Start_Date = $listResult[12]
-      End_Date = $listResult[13]
-      Avg_CPU_Usage_Percent = $listResult[14]
-      Max_CPU_Usage_Percent = $listResult[15]
-      Min_CPU_Usage_Percent = $listResult[16]
-      Limit_Count_CPU = $listResult[17]
+      Region = $listResult[5]
+      Type = $listResult[6]
+      PowerState = $listResult[7]
+      Os_Type = $listResult[8]
+      Os_Name = $listResult[9]
+      Instance = $listResult[10]
+      Quantity = $listResult[11]
+      Nb_Cores = $listResult[12]
+      Ram = $listResult[13]
+      Start_Date = $listResult[14]
+      End_Date = $listResult[15]
+      Avg_CPU_Usage_Percent = $listResult[16]
+      Max_CPU_Usage_Percent = $listResult[17]
+      Min_CPU_Usage_Percent = $listResult[18]
+      Limit_Count_CPU = $listResult[19]
+      Usage = $listResult[20]
     }
   )
   return $objResult
@@ -588,24 +511,20 @@ if ($subscriptions.Count -ne 0) {
         $globalError += $errorCount
         # -- Calculate CPU usage in percentage
         $avgPercentCpu = (
-          GetPercentCpuUsage -resourceId $vm.Id -metric $globalVar.metrics.cpuUsage -retentionDays $globalVar.metrics.retentionDays -timeGrain $timeGrain -limitCpu $globalVar.limitCountCpu
+          GetPercentCpuUsage -resourceId $vm.Id -metric $globalVar.metrics.cpuUsage -retentionDays $globalVar.metrics.retentionDays -totalHours $globalVar.metrics.totalHours -timeGrain $timeGrain -limitCpu $globalVar.limitCountCpu
         )
-        <#
-        # -- Calculate Memory usage in percentage
-        $avgPercentMem = (
-          GetPercentMemUsage -ResourceId $vm.Id -metric $globalVar.metrics.memoryAvailable -retentionDays $globalVar.metrics.retentionDays -vmMemory $vmSizing.MemoryInMB -timeGrain $timeGrain -limitMem $globalVar.limitCountMem
-        )
-        #>
+        
         # Aggregate informations
         $startDate = "{0:MM/dd/yyyy}" -f (Get-Date).AddDays(-$globalVar.metrics.retentionDays)
         $endDate = (Get-Date -Format "MM/dd/yyyy")
 
         $arrayVm += SetObjResult @(
           $subscription.Name, $vm.ResourceGroupName,
-          $vm.Name, $vm.Id, $vm.VmId, $vm.Location, $vm.PowerState,
-          $vm.OsType, $vm.OsName, $vm.VmSize,
+          $vm.Name, $vm.Id, $vm.VmId, $vm.Location, "VirtualMachines", $vm.PowerState,
+          $vm.OsType, $vm.OsName, $vm.VmSize,1,
           $vmSizing.NumberOfCores, $vmSizing.MemoryInMB, $startDate, $endDate
-          $avgPercentCpu['average'], $avgPercentCpu['maxReached'], $avgPercentCpu['minReached'], $avgPercentCpu['countLimitReached']
+          $avgPercentCpu['average'], $avgPercentCpu['maxReached'], $avgPercentCpu['minReached'], $avgPercentCpu['countLimitReached'],
+          $avgPercentCpu['usage']
         )
         $countVm += 1
         $vmTotal += 1

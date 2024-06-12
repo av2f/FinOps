@@ -13,7 +13,9 @@
     "cpuUsage": "Percentage CPU",
     "memoryAvailable": "Available Memory Bytes",
     "retentionDays": 30,
+    "totalHours": 720,
     "timeGrain": "01:00:00"
+    
   },
   "limitCountCpu": 0,
   "limitCountMem": 0,

@@ -19,7 +19,7 @@
     }
   },
   "subscriptionsScope": {
-    "scope": "D:/azFinOps/Data/Alstom/subscriptions.csv",
+    "scope": "C:/Users/fparment/Documents/AzFinOps/Data/AzureDataSource/subscriptions.csv",
     "delimiter": ";"
   },
   "saveEvery": 100

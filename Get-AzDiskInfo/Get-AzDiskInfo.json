@@ -5,7 +5,7 @@
   "generateLogFile": "Y",
   "checkIfLogIn": "Y",
   "subscriptionsScope": {
-    "scope": "C:/Users/fparment/Documents/AzFinOps/Data/Alstom/subscriptions.csv",
+    "scope": "C:/Users/fparment/Documents/AzFinOps/Data/AzureDataSource/subscriptions.csv",
     "delimiter": ";"
   },
   "saveEvery": 100
