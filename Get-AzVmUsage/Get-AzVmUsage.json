@@ -14,7 +14,7 @@
     "retentionDays": 30,
     "timeGrain": "01:00:00"
   },
-  "limitCountCpu": 0,
-  "limitCountMem": 0,
-  "saveEvery": 40
+  "limitCountCpu": 40,
+  "limitCountMem": 40,
+  "saveEvery": 50
 }

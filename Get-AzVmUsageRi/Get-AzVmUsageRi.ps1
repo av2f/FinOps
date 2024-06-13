@@ -603,12 +603,33 @@ if ($subscriptions.Count -ne 0) {
         if ($($vmScaleSets | Measure-Object | ForEach-Object count) -gt 0) {
           foreach($vmScaleSet in $vmScaleSets) {
             # Mettre dans arrayVmScaleSet
-            Write-Host $vmScaleSet.UniqueId " - " $vmScaleSet.Name " - " $vmScaleSet.Location " - " $vmScaleSet.Instance " - " $vmScaleSet.Capacity
+            $arrayVmScaleSet += SetObjResult @(
+              $subscription.Name, $resourceGroup.ResourceGroupName,
+              $vmScaleSet.Name, $vmScaleSet.Id, $vmScaleSet.UniqueIdId, $vmScaleSet.Location, "VirtualMachineScaleSets", "VirtualMachineScaleSet",
+              "VirtualMachineScaleSet", "VirtualMachineScaleSet", $vmScaleSet.Instance, $vmScaleSet.Capacity,
+              $null, $null, $null, $null, $null, $null, $null, $null, $null
+            )
+            $countVmScaleSet += 1
+            # Store the instance in the csv instance file
+            $arrayInstance += SetObjInstance @($vmScaleSet.Instance)
+            $countInstance += 1
+            if ($countVmScaleSet -eq $globalVar.saveEvery) {
+              $arrayVmScaleSet | Export-Csv -Path $csvResFile -Delimiter ";" -NoTypeInformation -Append
+              $arrayVmScaleSet = @()
+              $countVmScaleSet = 0
+            }
+            if ($countInstance -eq $globalVar.saveEvery) {
+              $arrayInstance | Export-Csv -Path $csvInstanceFile -Delimiter ";" -NoTypeInformation -Append
+              $arrayInstance = @()
+              $countInstance = 0
+            }
           }  
         }
       }
+      # Write last VmScaleSets
+      if ($countVmScaleSet -gt 0) { $arrayVmScaleSet | Export-Csv -Path $csvResFile -Delimiter ";" -NoTypeInformation -Append }
+      if ($countInstance -gt 0) { $arrayInstance | Export-Csv -Path $csvInstanceFile -Delimiter ";" -NoTypeInformation -Append }
     }
-
     Write-Verbose "---------------------------------------------"
   }
   # Execute script to add instances from reservedinstances.csv in Instances[mmddyyyyhhmmss].csv
