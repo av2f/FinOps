@@ -605,7 +605,7 @@ if ($subscriptions.Count -ne 0) {
             # Mettre dans arrayVmScaleSet
             $arrayVmScaleSet += SetObjResult @(
               $subscription.Name, $resourceGroup.ResourceGroupName,
-              $vmScaleSet.Name, $vmScaleSet.Id, $vmScaleSet.UniqueIdId, $vmScaleSet.Location, "VirtualMachineScaleSets", "VirtualMachineScaleSet",
+              $vmScaleSet.Name, $vmScaleSet.Id, $vmScaleSet.UniqueId, $vmScaleSet.Location, "VirtualMachineScaleSets", "VirtualMachineScaleSet",
               "VirtualMachineScaleSet", "VirtualMachineScaleSet", $vmScaleSet.Instance, $vmScaleSet.Capacity,
               $null, $null, $null, $null, $null, $null, $null, $null, $null
             )

@@ -574,7 +574,7 @@ function SetObjResult {
   if ($listResult.Count -ne 25) {
     $listResult = @('-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-','-','-','-','-','-','-','-','-','-','-','-')
   }
-  $objTagResult = @(
+  $objResult = @(
     [PSCustomObject]@{
       Subscription = $listResult[0]
       SubscriptionId = $listResult[1]
@@ -603,7 +603,7 @@ function SetObjResult {
       NB_AHB_Cores_Deallocated_Wasted = $listResult[24]
     }
   )
-  return $objTagResult
+  return $objResult
 }
 #
 <# ------------------------------------------------------------------------

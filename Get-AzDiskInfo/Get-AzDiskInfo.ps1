@@ -243,7 +243,7 @@ function SetObjResult {
   if ($listResult.Count -ne 13) {
     $listResult = @('-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-')
   }
-  $objTagResult = @(
+  $objResult = @(
     [PSCustomObject]@{
       Subscription = $listResult[0]
       SubscriptionId = $listResult[1]
@@ -260,7 +260,7 @@ function SetObjResult {
       Managed_By = $listResult[12]
     }
   )
-  return $objTagResult
+  return $objResult
 }
 #
 <# ------------------------------------------------------------------------
@@ -317,9 +317,9 @@ if ($subscriptions.Count -gt 0) {
         $diskCount = $disks | Measure-Object | ForEach-Object Count
         # if at least a disk
         if ($diskCount -gt 0) {
+          if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: $($diskCount) disks found") }
+          Write-Verbose "-- $($diskCount) disks found"
           foreach ($disk in $disks) {
-            if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: $($diskCount) disks found") }
-            Write-Verbose "-- $($diskCount) disks found"
             # Aggregate informations
             $arrayDisk += SetObjResult @(
               $subscription.Name, $subscription.Id, $resourceGroup.ResourceGroupName,

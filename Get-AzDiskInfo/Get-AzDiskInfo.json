@@ -1,7 +1,7 @@
 {
   "pathResult": "C:/Users/fparment/Documents/AzFinOps/Data/GetAzDiskInfo/",
   "fileResult": "GetAzDiskInfo",
-  "chronoFile": "N",
+  "chronoFile": "Y",
   "generateLogFile": "Y",
   "checkIfLogIn": "Y",
   "subscriptionsScope": {

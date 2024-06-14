@@ -491,7 +491,7 @@ function SetObjResult {
   if ($listResult.Count -ne 22) {
     $listResult = @('-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-','-','-','-','-','-','-','-','-')
   }
-  $objTagResult = @(
+  $objResult = @(
     [PSCustomObject]@{
       Subscription = $listResult[0]
       ResourceGroup = $listResult[1]
@@ -517,7 +517,7 @@ function SetObjResult {
       Limit_Count_Mem = $listResult[21]
     }
   )
-  return $objTagResult
+  return $objResult
 }
 #
 <# ------------------------------------------------------------------------

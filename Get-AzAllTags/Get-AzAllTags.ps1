@@ -225,7 +225,7 @@ function SetObjResult {
   if ($listResult.Count -ne 14) {
     $listResult=@('-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-')
   }
-  $objTagResult = @(
+  $objResult = @(
     [PSCustomObject]@{
       SubscriptionName = $listResult[0]
       SubscriptionId = $listResult[1]
@@ -243,7 +243,7 @@ function SetObjResult {
       TagsDefined = $listResult[13]
     }
   )
-  return $objTagResult
+  return $objResult
 }
 
 function GetSubscriptions
