@@ -637,7 +637,7 @@ if ($subscriptions.Count -ne 0) {
   Write-Verbose "Add instances from reservedinstances.csv file in csv instances file"
   if (Test-Path -Path $globalVar.reservedInstance.sourceFile -PathType Leaf) {
     # if source file exists, run the script
-    & $PSScriptRoot\Get-AzInstanceRi.ps1
+    & $PSScriptRoot\Get-AzInstanceRi.ps1 -TargetFile $csvInstanceFile
     if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Instances added in csv instances file") }
     Write-Verbose "Instances added in csv instances file"
   }

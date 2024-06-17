@@ -4,7 +4,7 @@
   Version : 1.0
   Creation Date : 06/06/2024
                    
-  Add in file Instances[mmddyyyyhhmmss].csv the VM size (Product name) contained in 
+  Add in file Instances[mmddyyyyhhmmss].csv the VM size (Product name) contained in the 
 
   ========  A REVOIR ================
 
@@ -16,7 +16,10 @@
 ----------- #>
 [cmdletBinding()]
 
-param()
+param(
+  [Parameter(Mandatory = $true)]
+  [String]$TargetFile
+)
 
 # --- Disable breaking change Warning messages in Azure Powershell
 Set-Item -Path Env:\SuppressAzurePowerShellBreakingChangeWarnings -Value $true
@@ -27,23 +30,11 @@ Set-Item -Path Env:\SuppressAzurePowerShellBreakingChangeWarnings -Value $true
 # Retrieve global variables from json file
 $globalVar = Get-Content -Raw -Path "$($PSScriptRoot)\Get-AzVmUsageRi.json" | ConvertFrom-Json
 #
-$globalError = 0  # to count errors
-$globalChronoFile = (Get-Date -Format "MMddyyyyHHmmss") # Format for file with chrono
-$globalLog = $false # set to $true if generateLogFile in json file is set to "Y"
-
-<# -----------
-  Declare Functions
------------ #>
-
-# === A FINIR =====
-
-
-
-$targetFile = "C:/Users/fparment/Documents/AzFinOps/Data/ReservedInstances/Instances.csv"
+# $targetFile = "C:/Users/fparment/Documents/AzFinOps/Data/ReservedInstances/Instances.csv"
 $instances = @()
 
 $listInstances = Import-Csv -Path $globalVar.reservedInstance.sourceFile -Delimiter "," | Where-Object -Property type -eq  $($globalVar.reservedInstance.type) |
-  Select-Object -Property 'Product name'
+Select-Object -Property 'Product name'
 
 foreach ($instance in $listInstances) {
   $instances += @(
@@ -52,4 +43,4 @@ foreach ($instance in $listInstances) {
       }
     )
 }
-$instances | Export-Csv -Path $targetFile -Delimiter ";" -NoTypeInformation -Append
+$instances | Export-Csv -Path $TargetFile -Delimiter ";" -NoTypeInformation -Append
