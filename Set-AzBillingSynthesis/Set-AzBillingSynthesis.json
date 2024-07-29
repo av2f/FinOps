@@ -1,0 +1,6 @@
+{
+  "pathSource": "C:\\Users\\fparment\\Documents\\AzFinOps\\Data\\AzureDataSource\\Detailed_Usage_charges",
+  "pathTarget": "C:\\Users\\fparment\\Documents\\AzFinOps\\Data\\AzureDataSource\\Synthesis_Usage_charges",
+  "targetMonthly": "monthly",
+  "targetDaily" : "daily"
+}
