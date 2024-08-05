@@ -66,12 +66,12 @@ def get_billing_account(csvfile, df):
     reader = csv.reader(f, delimiter = ';')
     next(reader)  # skip the header row
     for row in reader:
-        print(row[0])
         billing_csv.append(row[0])
   for item in billing_ids:
     if (item not in billing_csv):
-      billing_id = billing_ids[billing_ids['BillingAccountId'] == item].iloc[0].tolist()
+      billing_id = ba[ba['BillingAccountId'] == item].iloc[0].tolist()
       with open(csvfile, 'a') as f:
+        print('je write')
         writer = csv.writer(f, delimiter=';')
         writer.writerow(billing_id)
 
