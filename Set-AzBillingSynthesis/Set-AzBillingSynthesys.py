@@ -30,15 +30,15 @@ def create_target_directory(directory):
 def process_file(file_to_process, is_grouped):
   dtype_dict = {
     'BillingAccountId': 'str', 'BillingAccountName': 'str', 'BillingPeriodEndDate': 'str', 'BillingProfileId': 'str', 'BillingProfileName': 'str', 'AccountOwnerId': 'str', 'AccountName': 'str', 'SubscriptionName': 'str', 'MeterCategory': 'str', 'MeterSubCategory': 'str',
-    'MeterName': 'str', 'Cost': 'float64', 'UnitPrice': 'float64', 'ResourceLocation': 'str', 'ConsumedService': 'str', 'ResourceName': 'str',
+    'MeterName': 'str', 'Cost': 'float64', 'UnitPrice': 'float64', 'BillingCurrency': 'str', 'ResourceLocation': 'str', 'ConsumedService': 'str', 'ResourceName': 'str',
     'CostCenter': 'str', 'ResourceGroup': 'str', 'ReservationId': 'str', 'ReservationName': 'str',
     'ProductOrderId': 'str', 'ProductOrderName': 'str', 'Term': 'str', 'ChargeType': 'str', 'PayGPrice': 'float64',
     'PricingModel': 'str', 'benefitName': 'str'
   }
 
   df = pd.read_csv(file_to_process, dtype=dtype_dict, sep=';', usecols=[
-    'BillingAccountId', 'BillingAccountName', 'BillingPeriodEndDate', 'AccountOwnerId', 'AccountName', 'SubscriptionName', 'MeterCategory',
-    'MeterSubCategory', 'MeterName', 'Cost', 'UnitPrice',	'ResourceLocation', 'ConsumedService', 'ResourceName',
+    'BillingAccountId', 'BillingAccountName', 'BillingPeriodEndDate', 'BillingProfileId', 'BillingProfileName', 'AccountOwnerId', 'AccountName', 'SubscriptionName', 'MeterCategory',
+    'MeterSubCategory', 'MeterName', 'Cost', 'UnitPrice',	'BillingCurrency', 'ResourceLocation', 'ConsumedService', 'ResourceName',
     'CostCenter', 'ResourceGroup', 'ReservationId', 'ReservationName', 'ProductOrderId', 'ProductOrderName', 'Term',
     'ChargeType', 'PayGPrice', 'PricingModel', 'benefitName'
   ])
@@ -46,7 +46,7 @@ def process_file(file_to_process, is_grouped):
   """
   if (is_grouped):
     return df.groupby([
-      'BillingAccountId', 'BillingPeriodEndDate', 'BillingProfileId', 'BillingProfileName', 'AccountOwnerId', 'AccountName', 'SubscriptionName', 'ResourceName',
+      'BillingAccountId', 'BillingPeriodEndDate', 'BillingProfileId', 'AccountOwnerId', 'AccountName', 'SubscriptionName', 'ResourceName',
       'MeterCategory', 'MeterSubCategory', 'MeterName', 'UnitPrice', 'ResourceLocation', 'ConsumedService', 'CostCenter',
       'ResourceGroup', 'ReservationId', 'ReservationName', 'ProductOrderId', 'ProductOrderName', 'Term', 'ChargeType',
       'PayGPrice', 'PricingModel', 'benefitName'
@@ -56,7 +56,7 @@ def process_file(file_to_process, is_grouped):
   return df
 
 def get_billing_account(csvfile, df):
-#
+  # Put description
   billing_csv = [] 
   ba = df[['BillingAccountId', 'BillingAccountName']]
   # Retrieve the billing_id
@@ -67,15 +67,50 @@ def get_billing_account(csvfile, df):
     next(reader)  # skip the header row
     for row in reader:
         billing_csv.append(row[0])
-  for item in billing_ids:
-    if (item not in billing_csv):
-      billing_id = ba[ba['BillingAccountId'] == item].iloc[0].tolist()
-      with open(csvfile, 'a') as f:
-        print('je write')
-        writer = csv.writer(f, delimiter=';')
-        writer.writerow(billing_id)
+  # if at least 1 item
+  if (len(billing_csv) > 0):
+    for item in billing_ids:
+      if (item not in billing_csv):
+        billing_id = ba[ba['BillingAccountId'] == item].iloc[0].tolist()
+        with open(csvfile, 'a', newline='') as f:
+          writer = csv.writer(f, delimiter=';')
+          writer.writerow(billing_id)
+  # else write all billing account
+  else:
+      for item in billing_ids:
+        billing_id = ba[ba['BillingAccountId'] == item].iloc[0].tolist()
+        with open(csvfile, 'a', newline='') as f:
+          writer = csv.writer(f, delimiter=';')
+          writer.writerow(billing_id)
 
-  
+def get_billing_profile(csvfile, df):
+  # Put description
+  billing_csv = [] 
+  bp = df[['BillingProfileId', 'BillingProfileName', 'BillingCurrency']]
+  # Retrieve the billing_id
+  billing_ids = bp['BillingProfileId'].unique()
+  # 
+  with open(csvfile, newline='') as f:
+    reader = csv.reader(f, delimiter = ';')
+    next(reader)  # skip the header row
+    for row in reader:
+      billing_csv.append(row[0])
+  # if at least 1 item
+  if (len(billing_csv) > 0):
+    for item in billing_ids:
+      if (item not in billing_csv):
+        billing_id = bp[bp['BillingProfileId'] == item].iloc[0].tolist()
+        with open(csvfile, 'a', newline='') as f:
+          writer = csv.writer(f, delimiter=';')
+          writer.writerow(billing_id)
+  # else write all billing account
+  else:
+      for item in billing_ids:
+        billing_id = bp[bp['BillingProfileId'] == item].iloc[0].tolist()
+        with open(csvfile, 'a', newline='') as f:
+          writer = csv.writer(f, delimiter=';')
+          writer.writerow(billing_id)
+
 # main program
 def main():
 
@@ -141,6 +176,18 @@ def main():
     print ('the file ' + account_file + ' was not found.')
     exit(1)
   get_billing_account(account_file, df)
+
+  # Process in Billing Profile
+  profile_file = os.path.join(parameters['pathData'], parameters['billingProfile'])
+  if (not os.path.isfile(profile_file)):
+    print ('the file ' + profile_file + ' was not found.')
+    exit(1)
+  get_billing_profile(profile_file, df)
+
+  # Drop columns BillingAccountName, BillingProfileName, BillingCurrency
+  # Voir si pertinent de supprimer comme le regroupement le fait
+  df.drop(columns=['BillingAccountName', 'BillingProfileName', 'BillingCurrency'], inplace=True)
+  print(df.info())
 
   
   # Write result file
