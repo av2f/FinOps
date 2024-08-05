@@ -1,6 +1,9 @@
 {
-  "pathSource": "C:\\Users\\fparment\\Documents\\AzFinOps\\Data\\AzureDataSource\\Detailed_Usage_charges",
-  "pathTarget": "C:\\Users\\fparment\\Documents\\AzFinOps\\Data\\AzureDataSource\\Synthesis_Usage_charges",
+  "pathData": "C:\\Users\\fparment\\Documents\\AzFinOps\\Data\\AzureDataSource",
+  "pathDetailed": "Detailed_Usage_charges",
+  "pathSynthesis": "Synthesis_Usage_charges",
   "targetMonthly": "monthly",
-  "targetDaily" : "daily"
+  "targetDaily" : "daily",
+  "billingAccount": "BillingAccount.csv",
+  "billingProfile": "BillingProfile.csv"
 }

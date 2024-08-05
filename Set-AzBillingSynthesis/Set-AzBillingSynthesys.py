@@ -1,5 +1,6 @@
 # Set-AzBillingSyntesis.py
 import pandas as pd
+import csv
 import json
 import os
 import re
@@ -28,90 +29,122 @@ def create_target_directory(directory):
   
 def process_file(file_to_process, is_grouped):
   dtype_dict = {
-    'BillingAccountId': 'str', 'BillingPeriodEndDate': 'str', 'AccountOwnerId': 'str', 'AccountName': 'str', 'SubscriptionName': 'str', 'MeterCategory': 'str', 'MeterSubCategory': 'str',
+    'BillingAccountId': 'str', 'BillingAccountName': 'str', 'BillingPeriodEndDate': 'str', 'BillingProfileId': 'str', 'BillingProfileName': 'str', 'AccountOwnerId': 'str', 'AccountName': 'str', 'SubscriptionName': 'str', 'MeterCategory': 'str', 'MeterSubCategory': 'str',
     'MeterName': 'str', 'Cost': 'float64', 'UnitPrice': 'float64', 'ResourceLocation': 'str', 'ConsumedService': 'str', 'ResourceName': 'str',
     'CostCenter': 'str', 'ResourceGroup': 'str', 'ReservationId': 'str', 'ReservationName': 'str',
     'ProductOrderId': 'str', 'ProductOrderName': 'str', 'Term': 'str', 'ChargeType': 'str', 'PayGPrice': 'float64',
     'PricingModel': 'str', 'benefitName': 'str'
   }
 
-  df = pd.read_csv(file_to_process, dtype=dtype_dict, usecols=[
-    'BillingAccountId', 'BillingPeriodEndDate', 'AccountOwnerId', 'AccountName', 'SubscriptionName', 'MeterCategory',
+  df = pd.read_csv(file_to_process, dtype=dtype_dict, sep=';', usecols=[
+    'BillingAccountId', 'BillingAccountName', 'BillingPeriodEndDate', 'AccountOwnerId', 'AccountName', 'SubscriptionName', 'MeterCategory',
     'MeterSubCategory', 'MeterName', 'Cost', 'UnitPrice',	'ResourceLocation', 'ConsumedService', 'ResourceName',
     'CostCenter', 'ResourceGroup', 'ReservationId', 'ReservationName', 'ProductOrderId', 'ProductOrderName', 'Term',
     'ChargeType', 'PayGPrice', 'PricingModel', 'benefitName'
   ])
 
+  """
   if (is_grouped):
     return df.groupby([
-      'BillingAccountId', 'BillingPeriodEndDate', 'AccountOwnerId', 'AccountName', 'SubscriptionName', 'ResourceName',
+      'BillingAccountId', 'BillingPeriodEndDate', 'BillingProfileId', 'BillingProfileName', 'AccountOwnerId', 'AccountName', 'SubscriptionName', 'ResourceName',
       'MeterCategory', 'MeterSubCategory', 'MeterName', 'UnitPrice', 'ResourceLocation', 'ConsumedService', 'CostCenter',
       'ResourceGroup', 'ReservationId', 'ReservationName', 'ProductOrderId', 'ProductOrderName', 'Term', 'ChargeType',
       'PayGPrice', 'PricingModel', 'benefitName'
     ], as_index=False, dropna=False).agg(Total_Cost = ('Cost', 'sum'))
   else:
-    return df
+  """
+  return df
+
+def get_billing_account(csvfile, df):
+#
+  billing_csv = [] 
+  ba = df[['BillingAccountId', 'BillingAccountName']]
+  # Retrieve the billing_id
+  billing_ids = ba['BillingAccountId'].unique()
+  # 
+  with open(csvfile, newline='') as f:
+    reader = csv.reader(f, delimiter = ';')
+    next(reader)  # skip the header row
+    for row in reader:
+        print(row[0])
+        billing_csv.append(row[0])
+  for item in billing_ids:
+    if (item not in billing_csv):
+      billing_id = billing_ids[billing_ids['BillingAccountId'] == item].iloc[0].tolist()
+      with open(csvfile, 'a') as f:
+        writer = csv.writer(f, delimiter=';')
+        writer.writerow(billing_id)
 
   
 # main program
 def main():
+
+  # sera mis en parametres
+  csv_source_file = 'Detail_Enrollment_88991105_202401_en.csv'
+
   # Retrieve directory of json file
-  
   json_file =  os.path.join(os.path.dirname(__file__), JSON_FILE)
   if (not os.path.isfile(json_file)):
     print ('the file ' + json_file + ' was not found.')
     exit(1)
-  
-  print(json_file)
-
-  # sera mis en parametres
-  csv_source_file = 'Detail_Enrollment_88991105_202404_en.csv'
 
   # voir pour récupérer le chemin du script
   parameters = read_json(json_file)
 
-  source_file = os.path.join(parameters['pathSource'], csv_source_file)
+  # Check if the source directory exists otherwise exit
+  source_path = os.path.join(parameters['pathData'], parameters['pathDetailed'])
+  if (not os.path.exists(source_path)):
+    print('the directory ' + source_path + ' was not found.')
+    exit(1)
+  
   # Check if file exists
+  source_file = os.path.join(source_path, csv_source_file)
   if (not os.path.isfile(source_file)):
     print ('the file ' + source_file + ' was not found.')
     exit(1)
 
   # Check if the target directory exists otherwise creates it
-  if (not create_target_directory(parameters['pathTarget'])):
+  target_path = os.path.join(parameters['pathData'], parameters['pathSynthesis'])
+  if (not create_target_directory(target_path)):
     print('Error : Error during the creation of the target directory.')
     exit(1)
 
   # Extract date from the file in format yyyymm
   split_file = csv_source_file.split('_')
   # Retrieve year and month in format yyyymm
-  x = datetime.datetime.now().strftime('%Y%m')
+  current_month = datetime.datetime.now().strftime('%Y%m')
   # Check if the source file is from current month
-  if (split_file[3] == x):
+  if (split_file[3] == current_month):
     # current month : process file without grouping
-    target_file = os.path.join(parameters['pathTarget'], parameters['targetDaily'])
+    target_file = os.path.join(target_path, parameters['targetDaily'])
     # Check if the target directory exists otherwise creates it
     if (not create_target_directory(target_file)):
       print('Error : Error during the creation of the target directory.')
       exit(1)
     # Create
     target_file = os.path.join(target_file, re.sub('Detail', 'Daily', csv_source_file))
-
-    result_process = process_file(source_file, False)
+    df = process_file(source_file, False)
   else:
     # process file grouping resources and calculating total cost
-    
-    target_file = os.path.join(parameters['pathTarget'], parameters['targetMonthly'])
+    target_file = os.path.join(target_path, parameters['targetMonthly'])
     # Check if the target directory exists otherwise creates it
     if (not create_target_directory(target_file)):
       print('Error : Error during the creation of the target directory.')
       exit(1)
     # Create file result
     target_file = os.path.join(target_file, re.sub('Detail', 'Monthly', csv_source_file))
-    
-    result_process = process_file(source_file, True)
+    df = process_file(source_file, True)
+
+  # Process in Billing Account
+  account_file = os.path.join(parameters['pathData'], parameters['billingAccount'])
+  if (not os.path.isfile(account_file)):
+    print ('the file ' + account_file + ' was not found.')
+    exit(1)
+  get_billing_account(account_file, df)
+
   
-  # Write result
-  result_process.to_csv(target_file, sep=',', index=False)
+  # Write result file
+  # result_process.to_csv(target_file, sep=',', index=False)
   
   print(target_file)
 
