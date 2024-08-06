@@ -18,7 +18,7 @@ def create_target_directory(directory):
   Check if directory exists.
   If not the case, create it
   """
-  if (not os.path.exists(directory)):
+  if not os.path.exists(directory):
     try:
       os.mkdir(directory)
     except OSError as error:
@@ -31,16 +31,16 @@ def process_file(file_to_process, is_grouped):
   dtype_dict = {
     'BillingAccountId': 'str', 'BillingAccountName': 'str', 'BillingPeriodEndDate': 'str', 'BillingProfileId': 'str', 'BillingProfileName': 'str', 'AccountOwnerId': 'str', 'AccountName': 'str', 'SubscriptionName': 'str', 'MeterCategory': 'str', 'MeterSubCategory': 'str',
     'MeterName': 'str', 'Cost': 'float64', 'UnitPrice': 'float64', 'BillingCurrency': 'str', 'ResourceLocation': 'str', 'ConsumedService': 'str', 'ResourceName': 'str',
-    'CostCenter': 'str', 'ResourceGroup': 'str', 'ReservationId': 'str', 'ReservationName': 'str',
-    'ProductOrderId': 'str', 'ProductOrderName': 'str', 'Term': 'str', 'ChargeType': 'str', 'PayGPrice': 'float64',
-    'PricingModel': 'str', 'benefitName': 'str'
+    'AdditionalInfo': 'str', 'CostCenter': 'str', 'ResourceGroup': 'str', 'ReservationName': 'str',
+    'ProductOrderName': 'str', 'Term': 'str', 'ChargeType': 'str', 'PayGPrice': 'float64',
+    'PricingModel': 'str'
   }
 
-  df = pd.read_csv(file_to_process, dtype=dtype_dict, sep=';', usecols=[
+  df = pd.read_csv(file_to_process, dtype=dtype_dict, sep=',', usecols=[
     'BillingAccountId', 'BillingAccountName', 'BillingPeriodEndDate', 'BillingProfileId', 'BillingProfileName', 'AccountOwnerId', 'AccountName', 'SubscriptionName', 'MeterCategory',
     'MeterSubCategory', 'MeterName', 'Cost', 'UnitPrice',	'BillingCurrency', 'ResourceLocation', 'ConsumedService', 'ResourceName',
-    'CostCenter', 'ResourceGroup', 'ReservationId', 'ReservationName', 'ProductOrderId', 'ProductOrderName', 'Term',
-    'ChargeType', 'PayGPrice', 'PricingModel', 'benefitName'
+    'AdditionalInfo', 'CostCenter', 'ResourceGroup', 'ReservationName', 'ProductOrderName', 'Term',
+    'ChargeType', 'PayGPrice', 'PricingModel'
   ])
 
   """
@@ -48,8 +48,8 @@ def process_file(file_to_process, is_grouped):
     return df.groupby([
       'BillingAccountId', 'BillingPeriodEndDate', 'BillingProfileId', 'AccountOwnerId', 'AccountName', 'SubscriptionName', 'ResourceName',
       'MeterCategory', 'MeterSubCategory', 'MeterName', 'UnitPrice', 'ResourceLocation', 'ConsumedService', 'CostCenter',
-      'ResourceGroup', 'ReservationId', 'ReservationName', 'ProductOrderId', 'ProductOrderName', 'Term', 'ChargeType',
-      'PayGPrice', 'PricingModel', 'benefitName'
+      'ResourceGroup', ReservationName', 'ProductOrderName', 'Term', 'ChargeType',
+      'PayGPrice', 'PricingModel'
     ], as_index=False, dropna=False).agg(Total_Cost = ('Cost', 'sum'))
   else:
   """
@@ -68,9 +68,9 @@ def get_billing_account(csvfile, df):
     for row in reader:
         billing_csv.append(row[0])
   # if at least 1 item
-  if (len(billing_csv) > 0):
+  if len(billing_csv) > 0:
     for item in billing_ids:
-      if (item not in billing_csv):
+      if item not in billing_csv:
         billing_id = ba[ba['BillingAccountId'] == item].iloc[0].tolist()
         with open(csvfile, 'a', newline='') as f:
           writer = csv.writer(f, delimiter=';')
@@ -96,9 +96,9 @@ def get_billing_profile(csvfile, df):
     for row in reader:
       billing_csv.append(row[0])
   # if at least 1 item
-  if (len(billing_csv) > 0):
+  if len(billing_csv) > 0:
     for item in billing_ids:
-      if (item not in billing_csv):
+      if item not in billing_csv:
         billing_id = bp[bp['BillingProfileId'] == item].iloc[0].tolist()
         with open(csvfile, 'a', newline='') as f:
           writer = csv.writer(f, delimiter=';')
@@ -111,15 +111,34 @@ def get_billing_profile(csvfile, df):
           writer = csv.writer(f, delimiter=';')
           writer.writerow(billing_id)
 
-# main program
+def get_sku(info, criteria):
+  # Put Description
+  new_info = ''
+  str_info = str(info)
+  if criteria in str_info:
+    sku = re.search(rf"\"{re.escape(criteria)}\":\"([\w]*)\"", str_info)
+    if sku:
+      new_info = sku.group(1).strip()
+  return new_info
+
+def get_reservation_type(product):
+  new_product = ''
+  str_product = str(product)
+  if len(str_product) > 3:
+    reservation_type = re.search(r"^([\w -\/]*),", str_product)
+    if reservation_type:
+      new_product = reservation_type.group(1)
+  return new_product
+#
+# ---------------------- main program
 def main():
 
-  # sera mis en parametres
-  csv_source_file = 'Detail_Enrollment_88991105_202401_en.csv'
+  # === sera mis en parametres
+  csv_source_file = 'Detail_Enrollment_88991105_202404_en.csv'
 
   # Retrieve directory of json file
   json_file =  os.path.join(os.path.dirname(__file__), JSON_FILE)
-  if (not os.path.isfile(json_file)):
+  if not os.path.isfile(json_file):
     print ('the file ' + json_file + ' was not found.')
     exit(1)
 
@@ -128,32 +147,34 @@ def main():
 
   # Check if the source directory exists otherwise exit
   source_path = os.path.join(parameters['pathData'], parameters['pathDetailed'])
-  if (not os.path.exists(source_path)):
+  if not os.path.exists(source_path):
     print('the directory ' + source_path + ' was not found.')
     exit(1)
   
   # Check if file exists
   source_file = os.path.join(source_path, csv_source_file)
-  if (not os.path.isfile(source_file)):
+  if not os.path.isfile(source_file):
     print ('the file ' + source_file + ' was not found.')
     exit(1)
 
   # Check if the target directory exists otherwise creates it
   target_path = os.path.join(parameters['pathData'], parameters['pathSynthesis'])
-  if (not create_target_directory(target_path)):
+  if not create_target_directory(target_path) :
     print('Error : Error during the creation of the target directory.')
     exit(1)
 
   # Extract date from the file in format yyyymm
   split_file = csv_source_file.split('_')
+  
   # Retrieve year and month in format yyyymm
   current_month = datetime.datetime.now().strftime('%Y%m')
+  
   # Check if the source file is from current month
-  if (split_file[3] == current_month):
+  if split_file[3] == current_month:
     # current month : process file without grouping
     target_file = os.path.join(target_path, parameters['targetDaily'])
     # Check if the target directory exists otherwise creates it
-    if (not create_target_directory(target_file)):
+    if not create_target_directory(target_file):
       print('Error : Error during the creation of the target directory.')
       exit(1)
     # Create
@@ -163,7 +184,7 @@ def main():
     # process file grouping resources and calculating total cost
     target_file = os.path.join(target_path, parameters['targetMonthly'])
     # Check if the target directory exists otherwise creates it
-    if (not create_target_directory(target_file)):
+    if not create_target_directory(target_file):
       print('Error : Error during the creation of the target directory.')
       exit(1)
     # Create file result
@@ -172,28 +193,33 @@ def main():
 
   # Process in Billing Account
   account_file = os.path.join(parameters['pathData'], parameters['billingAccount'])
-  if (not os.path.isfile(account_file)):
+  if not os.path.isfile(account_file):
     print ('the file ' + account_file + ' was not found.')
     exit(1)
+  
   get_billing_account(account_file, df)
 
   # Process in Billing Profile
   profile_file = os.path.join(parameters['pathData'], parameters['billingProfile'])
-  if (not os.path.isfile(profile_file)):
+  if not os.path.isfile(profile_file):
     print ('the file ' + profile_file + ' was not found.')
     exit(1)
+  
   get_billing_profile(profile_file, df)
 
   # Drop columns BillingAccountName, BillingProfileName, BillingCurrency
   # Voir si pertinent de supprimer comme le regroupement le fait
   df.drop(columns=['BillingAccountName', 'BillingProfileName', 'BillingCurrency'], inplace=True)
-  print(df.info())
 
+  # Retrieve SKU of VM in additionnalInfo column
+  df['AdditionalInfo'] = df['AdditionalInfo'].apply(get_sku, args=(parameters['additionalInfo'],))
+  
+  # Retrieve Reservation type in ProductOrderName
+  df['ProductOrderName'] = df['ProductOrderName'].apply(get_reservation_type)
   
   # Write result file
-  # result_process.to_csv(target_file, sep=',', index=False)
+  df.to_csv(target_file, sep=',', index=False)
   
   print(target_file)
-
 
 main()

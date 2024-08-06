@@ -5,5 +5,6 @@
   "targetMonthly": "monthly",
   "targetDaily" : "daily",
   "billingAccount": "BillingAccount.csv",
-  "billingProfile": "BillingProfile.csv"
+  "billingProfile": "BillingProfile.csv",
+  "additionalInfo": "ServiceType"
 }
