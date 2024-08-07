@@ -6,5 +6,6 @@
   "targetDaily" : "daily",
   "billingAccount": "BillingAccount.csv",
   "billingProfile": "BillingProfile.csv",
-  "additionalInfo": "ServiceType"
+  "additionalInfo": "ServiceType",
+  "finopsTags": "Environment,AIPCode,AIPName,AIPOwner,AIPCriticality,Customer,DepartmentName,Owner"
 }

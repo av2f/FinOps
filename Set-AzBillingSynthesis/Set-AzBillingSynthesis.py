@@ -1,3 +1,11 @@
+"""
+  Name    : Set-AzBillingSynthesis.py
+  Author  : Frederic Parmentier
+  Version : 1.0
+  Creation Date : 08/05/2024
+
+  ****** PUT DESCRIPTION *******
+"""
 # Set-AzBillingSyntesis.py
 import pandas as pd
 import csv
@@ -10,6 +18,13 @@ import datetime
 JSON_FILE = 'Set-AzBillingSynthesis.json'
 
 def read_json(file):
+  """
+    Retrieve parameters in the Json parameters file
+    Input:
+      - file : Json parameters file
+    Output: 
+      - dictionnary with key:value from Json parameters file
+  """
   with open(file, 'r') as f:
     return json.load(f)
 
@@ -29,21 +44,23 @@ def create_target_directory(directory):
   
 def process_file(file_to_process, is_grouped):
   dtype_dict = {
-    'BillingAccountId': 'str', 'BillingAccountName': 'str', 'BillingPeriodEndDate': 'str', 'BillingProfileId': 'str', 'BillingProfileName': 'str', 'AccountOwnerId': 'str', 'AccountName': 'str', 'SubscriptionName': 'str', 'MeterCategory': 'str', 'MeterSubCategory': 'str',
-    'MeterName': 'str', 'Cost': 'float64', 'UnitPrice': 'float64', 'BillingCurrency': 'str', 'ResourceLocation': 'str', 'ConsumedService': 'str', 'ResourceName': 'str',
-    'AdditionalInfo': 'str', 'CostCenter': 'str', 'ResourceGroup': 'str', 'ReservationName': 'str',
-    'ProductOrderName': 'str', 'Term': 'str', 'ChargeType': 'str', 'PayGPrice': 'float64',
-    'PricingModel': 'str'
+    'BillingAccountId': 'str', 'BillingAccountName': 'str', 'BillingPeriodEndDate': 'str', 'BillingProfileId': 'str', 'BillingProfileName': 'str',
+    'AccountOwnerId': 'str', 'AccountName': 'str', 'SubscriptionName': 'str', 'Date': 'str', 'MeterCategory': 'str', 'MeterSubCategory': 'str',
+    'MeterName': 'str', 'Cost': 'float64', 'UnitPrice': 'float64', 'BillingCurrency': 'str', 'ResourceLocation': 'str', 'ConsumedService': 'str',
+    'ResourceName': 'str', 'AdditionalInfo': 'str', 'Tags': 'str', 'CostCenter': 'str', 'ResourceGroup': 'str', 'ReservationName': 'str',
+    'ProductOrderName': 'str', 'Term': 'str', 'ChargeType': 'str', 'PayGPrice': 'float64', 'PricingModel': 'str'
   }
 
-  df = pd.read_csv(file_to_process, dtype=dtype_dict, sep=',', usecols=[
-    'BillingAccountId', 'BillingAccountName', 'BillingPeriodEndDate', 'BillingProfileId', 'BillingProfileName', 'AccountOwnerId', 'AccountName', 'SubscriptionName', 'MeterCategory',
-    'MeterSubCategory', 'MeterName', 'Cost', 'UnitPrice',	'BillingCurrency', 'ResourceLocation', 'ConsumedService', 'ResourceName',
-    'AdditionalInfo', 'CostCenter', 'ResourceGroup', 'ReservationName', 'ProductOrderName', 'Term',
-    'ChargeType', 'PayGPrice', 'PricingModel'
+  df = pd.read_csv(file_to_process, dtype=dtype_dict, sep=';', usecols=[
+    'BillingAccountId', 'BillingAccountName', 'BillingPeriodEndDate', 'BillingProfileId', 'BillingProfileName',
+    'AccountOwnerId', 'AccountName', 'SubscriptionName', 'Date', 'MeterCategory', 'MeterSubCategory',
+    'MeterName', 'Cost', 'UnitPrice',	'BillingCurrency', 'ResourceLocation', 'ConsumedService',
+    'ResourceName', 'AdditionalInfo', 'Tags', 'CostCenter', 'ResourceGroup', 'ReservationName',
+    'ProductOrderName', 'Term', 'ChargeType', 'PayGPrice', 'PricingModel'
   ])
 
   """
+  A REVOIR
   if (is_grouped):
     return df.groupby([
       'BillingAccountId', 'BillingPeriodEndDate', 'BillingProfileId', 'AccountOwnerId', 'AccountName', 'SubscriptionName', 'ResourceName',
@@ -127,14 +144,26 @@ def get_reservation_type(product):
   if len(str_product) > 3:
     reservation_type = re.search(r"^([\w -\/]*),", str_product)
     if reservation_type:
-      new_product = reservation_type.group(1)
+      new_product = reservation_type.group(1).strip()
   return new_product
+
+def get_finops_tags(tags, list_tags):
+  dic_tags = {}
+  str_tags = str(tags)
+  if len(str_tags) > 3:
+    finops_tags = list_tags.split(',')
+    for finops_tag in finops_tags:
+      if finops_tag in str_tags:
+        tag_value = re.search(rf"\"{re.escape(finops_tag)}\": \"([\w .@]*)\"", str_tags)
+        if tag_value:
+          dic_tags[finops_tag] = tag_value.group(1).strip()
+  return dic_tags
 #
 # ---------------------- main program
 def main():
 
   # === sera mis en parametres
-  csv_source_file = 'Detail_Enrollment_88991105_202404_en.csv'
+  csv_source_file = 'Detail_Enrollment_88991105_202401_en.csv'
 
   # Retrieve directory of json file
   json_file =  os.path.join(os.path.dirname(__file__), JSON_FILE)
@@ -196,7 +225,6 @@ def main():
   if not os.path.isfile(account_file):
     print ('the file ' + account_file + ' was not found.')
     exit(1)
-  
   get_billing_account(account_file, df)
 
   # Process in Billing Profile
@@ -204,18 +232,22 @@ def main():
   if not os.path.isfile(profile_file):
     print ('the file ' + profile_file + ' was not found.')
     exit(1)
-  
   get_billing_profile(profile_file, df)
-
   # Drop columns BillingAccountName, BillingProfileName, BillingCurrency
   # Voir si pertinent de supprimer comme le regroupement le fait
   df.drop(columns=['BillingAccountName', 'BillingProfileName', 'BillingCurrency'], inplace=True)
 
-  # Retrieve SKU of VM in additionnalInfo column
+  # Extract SKU of VM in additionnalInfo column
   df['AdditionalInfo'] = df['AdditionalInfo'].apply(get_sku, args=(parameters['additionalInfo'],))
   
-  # Retrieve Reservation type in ProductOrderName
+  # Extract Reservation type in ProductOrderName
   df['ProductOrderName'] = df['ProductOrderName'].apply(get_reservation_type)
+
+  # Extract FinOps tags
+  df['Tags'] = df['Tags'].apply(get_finops_tags, args=(parameters['finopsTags'],))
+
+  # Convert Date in date format
+  df['Date'] = pd.to_datetime(df['Date'], format = '%m/%d/%Y')
   
   # Write result file
   df.to_csv(target_file, sep=',', index=False)
