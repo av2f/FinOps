@@ -22,7 +22,7 @@ def read_json(file):
   """
     Retrieve parameters in the Json parameters file
     Input:
-      - file : Json parameters file
+      - file: Json parameters file
     Output: 
       - dictionnary with key:value from Json parameters file
   """
@@ -31,8 +31,8 @@ def read_json(file):
 
 def create_target_directory(directory):
   """
-  Check if directory exists.
-  If not the case, create it
+    Check if directory exists.
+    If not the case, create it
   """
   if not os.path.exists(directory):
     try:
@@ -43,7 +43,19 @@ def create_target_directory(directory):
   else:
     return True
   
-def load_file(source_file, separator):
+def calculate_duration(start, end):
+  """
+    Calculate and format the duration of execution of script
+    Input:
+      - start: script start time in seconds
+      - end: script end time
+    Output: 
+      - script execution time with format hh:mm:ss
+  """
+  time_elapse = time.gmtime(end-start)
+  return time.strftime('%Hh:%Mm:%Ss', time_elapse)
+
+def load_file(source_file, separator, csv_encoding):
   dtype_dict = {
       'BillingAccountId': 'str', 'BillingAccountName': 'str', 'BillingPeriodEndDate': 'str', 'BillingProfileId': 'str', 'BillingProfileName': 'str',
       'AccountOwnerId': 'str', 'AccountName': 'str', 'SubscriptionName': 'str', 'Date': 'str', 'MeterCategory': 'str', 'MeterSubCategory': 'str',
@@ -52,7 +64,7 @@ def load_file(source_file, separator):
       'ProductOrderName': 'str', 'Term': 'str', 'ChargeType': 'str', 'PayGPrice': 'float64', 'PricingModel': 'str'
     }
 
-  return pd.read_csv(source_file, dtype=dtype_dict, sep=separator, usecols=[
+  return pd.read_csv(source_file, dtype=dtype_dict, sep=separator, encoding=csv_encoding, usecols=[
       'BillingAccountId', 'BillingAccountName', 'BillingPeriodEndDate', 'BillingProfileId', 'BillingProfileName',
       'AccountOwnerId', 'AccountName', 'SubscriptionName', 'Date', 'MeterCategory', 'MeterSubCategory',
       'MeterName', 'Cost', 'UnitPrice',	'BillingCurrency', 'ResourceLocation', 'ConsumedService',
@@ -60,14 +72,14 @@ def load_file(source_file, separator):
       'ProductOrderName', 'Term', 'ChargeType', 'PayGPrice', 'PricingModel'
     ])
 
-def synthesis_file(df):
+def synthesis_file(df, finops_tags):
+  tags = finops_tags.split(',')
   return df.groupby([
   'BillingAccountId', 'BillingPeriodEndDate', 'BillingProfileId', 'AccountOwnerId',
   'AccountName', 'SubscriptionName', 'MeterCategory', 'MeterSubCategory',
   'MeterName', 'UnitPrice',	'ResourceLocation', 'ConsumedService',
   'ResourceName', 'AdditionalInfo', 'Tags', 'CostCenter', 'ResourceGroup', 'ReservationName',
-  'ProductOrderName', 'Term', 'ChargeType', 'PayGPrice', 'PricingModel'
-  ], as_index=False, dropna=False).agg(Total_Cost = ('Cost', 'sum'))
+  'ProductOrderName', 'Term', 'ChargeType', 'PayGPrice', 'PricingModel'] + tags, as_index=False, dropna=False).agg(Total_Cost = ('Cost', 'sum'))
 
 def get_billing_account(csvfile, df):
   # Put description
@@ -139,10 +151,17 @@ def get_reservation_type(product):
   new_product = ''
   str_product = str(product)
   if len(str_product) > 3:
+    str_product = str_product.replace(u'\xa0' , u'')
     reservation_type = re.search(r"^([\w -\/]*),", str_product)
     if reservation_type:
       new_product = reservation_type.group(1).strip()
   return new_product
+
+def set_finops_tags(df, finops_tags):
+  tags = finops_tags.split(',')
+  for tag in tags:
+    df[tag] = ''
+  return df
 
 def get_finops_tags(tags, list_tags):
   dic_tags = {}
@@ -155,9 +174,19 @@ def get_finops_tags(tags, list_tags):
         if tag_value:
           dic_tags[finops_tag] = tag_value.group(1).strip()
   str_dic_tags = str(dic_tags)
+  # if dic is empty
   if len(dic_tags) == 0:
     str_dic_tags = ""      
   return str_dic_tags
+
+def set_finops_tag(tags, key_tag):
+  tag_value = ''
+  if len(tags) > 0:
+    if key_tag in tags:
+      value = re.search(rf"'{re.escape(key_tag)}': '([\w .@]*)'", tags)
+      if value:
+        tag_value = str(value.group(1).strip())
+  return tag_value
 
 #
 # ---------------------- main program
@@ -167,7 +196,7 @@ def main():
   start = time.time()
 
   # === sera mis en parametres
-  csv_source_file = 'Detail_Enrollment_88991105_202404_en.csv'
+  csv_source_file = 'Detail_Enrollment_88991105_202405_en.csv'
 
   # Check if Json file exists
   json_file =  os.path.join(os.path.dirname(__file__), JSON_FILE)
@@ -192,7 +221,7 @@ def main():
     exit(1)
 
   # Load the source file
-  df = load_file(source_file, parameters['csvDetailedSeparator'])
+  df = load_file(source_file, parameters['csvDetailedSeparator'], parameters['csvEncoding'])
 
   # Process in Billing Account
   account_file = os.path.join(parameters['pathData'], parameters['billingAccount'])
@@ -217,9 +246,23 @@ def main():
   # Extract Reservation type in ProductOrderName
   df['ProductOrderName'] = df['ProductOrderName'].apply(get_reservation_type)
 
+  # Add FinOps Tags in df
+  df = set_finops_tags(df, parameters['finopsTags'])
+
   # Extract FinOps tags
   df['Tags'] = df['Tags'].apply(get_finops_tags, args=(parameters['finopsTags'],))
-  
+
+  # Grouping of rows
+  df = synthesis_file(df, parameters['finopsTags'])
+
+  # Assign values to finOps tags columns
+  finops_tags = parameters['finopsTags'].split(',')
+  for finops_tag in finops_tags:
+    df[finops_tag] = df['Tags'].apply(set_finops_tag, args=(finops_tag,))
+
+  # Drop column 'Tags'
+  df.drop(columns=['Tags'], inplace=True)
+
   # --- Write result file ---
   # Check if the target directory exists otherwise creates it
   target_path = os.path.join(parameters['pathData'], parameters['pathSynthesis'])
@@ -248,9 +291,9 @@ def main():
     if not create_target_directory(target_file):
       print('Error : Error during the creation of the target directory.')
       exit(1)
-    # Create file result
-    target_file = os.path.join(target_file, re.sub('Detail', 'Monthly', csv_source_file))
-    df = synthesis_file(df)
+  
+  # Create file result
+  target_file = os.path.join(target_file, re.sub('Detail', 'Monthly', csv_source_file))
   
   # Write result file
   df.to_csv(target_file, sep=',', index=False)
@@ -259,6 +302,7 @@ def main():
   
   # Calulate time execution
   end = time.time()
-  print(end - start)
+  duration = calculate_duration(start, end)
+  print ('Script executed in ' + duration)
 
 main()

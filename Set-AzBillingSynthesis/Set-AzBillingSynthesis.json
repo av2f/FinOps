@@ -2,6 +2,7 @@
   "pathData": "C:\\Users\\fparment\\Documents\\AzFinOps\\Data\\AzureDataSource",
   "pathDetailed": "Detailed_Usage_charges",
   "csvDetailedSeparator": ",",
+  "csvEncoding": "utf-8",
   "pathSynthesis": "Synthesis_Usage_charges",
   "targetMonthly": "monthly",
   "targetDaily" : "daily",
