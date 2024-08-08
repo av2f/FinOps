@@ -6,7 +6,7 @@
 
   ****** PUT DESCRIPTION *******
 """
-# Set-AzBillingSyntesis.py
+
 import pandas as pd
 import csv
 import json
@@ -43,35 +43,31 @@ def create_target_directory(directory):
   else:
     return True
   
-def process_file(file_to_process, is_grouped):
+def load_file(source_file, separator):
   dtype_dict = {
-    'BillingAccountId': 'str', 'BillingAccountName': 'str', 'BillingPeriodEndDate': 'str', 'BillingProfileId': 'str', 'BillingProfileName': 'str',
-    'AccountOwnerId': 'str', 'AccountName': 'str', 'SubscriptionName': 'str', 'Date': 'str', 'MeterCategory': 'str', 'MeterSubCategory': 'str',
-    'MeterName': 'str', 'Cost': 'float64', 'UnitPrice': 'float64', 'BillingCurrency': 'str', 'ResourceLocation': 'str', 'ConsumedService': 'str',
-    'ResourceName': 'str', 'AdditionalInfo': 'str', 'Tags': 'str', 'CostCenter': 'str', 'ResourceGroup': 'str', 'ReservationName': 'str',
-    'ProductOrderName': 'str', 'Term': 'str', 'ChargeType': 'str', 'PayGPrice': 'float64', 'PricingModel': 'str'
-  }
+      'BillingAccountId': 'str', 'BillingAccountName': 'str', 'BillingPeriodEndDate': 'str', 'BillingProfileId': 'str', 'BillingProfileName': 'str',
+      'AccountOwnerId': 'str', 'AccountName': 'str', 'SubscriptionName': 'str', 'Date': 'str', 'MeterCategory': 'str', 'MeterSubCategory': 'str',
+      'MeterName': 'str', 'Cost': 'float64', 'UnitPrice': 'float64', 'BillingCurrency': 'str', 'ResourceLocation': 'str', 'ConsumedService': 'str',
+      'ResourceName': 'str', 'AdditionalInfo': 'str', 'Tags': 'str', 'CostCenter': 'str', 'ResourceGroup': 'str', 'ReservationName': 'str',
+      'ProductOrderName': 'str', 'Term': 'str', 'ChargeType': 'str', 'PayGPrice': 'float64', 'PricingModel': 'str'
+    }
 
-  df = pd.read_csv(file_to_process, dtype=dtype_dict, sep=';', usecols=[
-    'BillingAccountId', 'BillingAccountName', 'BillingPeriodEndDate', 'BillingProfileId', 'BillingProfileName',
-    'AccountOwnerId', 'AccountName', 'SubscriptionName', 'Date', 'MeterCategory', 'MeterSubCategory',
-    'MeterName', 'Cost', 'UnitPrice',	'BillingCurrency', 'ResourceLocation', 'ConsumedService',
-    'ResourceName', 'AdditionalInfo', 'Tags', 'CostCenter', 'ResourceGroup', 'ReservationName',
-    'ProductOrderName', 'Term', 'ChargeType', 'PayGPrice', 'PricingModel'
-  ])
+  return pd.read_csv(source_file, dtype=dtype_dict, sep=separator, usecols=[
+      'BillingAccountId', 'BillingAccountName', 'BillingPeriodEndDate', 'BillingProfileId', 'BillingProfileName',
+      'AccountOwnerId', 'AccountName', 'SubscriptionName', 'Date', 'MeterCategory', 'MeterSubCategory',
+      'MeterName', 'Cost', 'UnitPrice',	'BillingCurrency', 'ResourceLocation', 'ConsumedService',
+      'ResourceName', 'AdditionalInfo', 'Tags', 'CostCenter', 'ResourceGroup', 'ReservationName',
+      'ProductOrderName', 'Term', 'ChargeType', 'PayGPrice', 'PricingModel'
+    ])
 
-  """
-  A REVOIR
-  if (is_grouped):
-    return df.groupby([
-      'BillingAccountId', 'BillingPeriodEndDate', 'BillingProfileId', 'AccountOwnerId', 'AccountName', 'SubscriptionName', 'ResourceName',
-      'MeterCategory', 'MeterSubCategory', 'MeterName', 'UnitPrice', 'ResourceLocation', 'ConsumedService', 'CostCenter',
-      'ResourceGroup', ReservationName', 'ProductOrderName', 'Term', 'ChargeType',
-      'PayGPrice', 'PricingModel'
-    ], as_index=False, dropna=False).agg(Total_Cost = ('Cost', 'sum'))
-  else:
-  """
-  return df
+def synthesis_file(df):
+  return df.groupby([
+  'BillingAccountId', 'BillingPeriodEndDate', 'BillingProfileId', 'AccountOwnerId',
+  'AccountName', 'SubscriptionName', 'MeterCategory', 'MeterSubCategory',
+  'MeterName', 'UnitPrice',	'ResourceLocation', 'ConsumedService',
+  'ResourceName', 'AdditionalInfo', 'Tags', 'CostCenter', 'ResourceGroup', 'ReservationName',
+  'ProductOrderName', 'Term', 'ChargeType', 'PayGPrice', 'PricingModel'
+  ], as_index=False, dropna=False).agg(Total_Cost = ('Cost', 'sum'))
 
 def get_billing_account(csvfile, df):
   # Put description
@@ -158,36 +154,11 @@ def get_finops_tags(tags, list_tags):
         tag_value = re.search(rf"\"{re.escape(finops_tag)}\": \"([\w .@]*)\"", str_tags)
         if tag_value:
           dic_tags[finops_tag] = tag_value.group(1).strip()
-  return dic_tags
+  str_dic_tags = str(dic_tags)
+  if len(dic_tags) == 0:
+    str_dic_tags = ""      
+  return str_dic_tags
 
-def uniformize_tags(df):
-  """
-    Retrieve the most recent value of the column Tags for a resource and
-    assigns it to all other lines matching this resource
-    Input: df the dataframe
-    Output: uniformize tags of resources
-  """
-  # Retrieve list of resources
-  u_resources = df['ResourceName'].unique()
-  # if at least 1 resource
-  if len(u_resources) > 0:
-    # Extract resources with date and tags
-    resources = df[['Date', 'ResourceName', 'Tags']]
-    c = 0
-    for u_resource in u_resources:
-      s_resource = resources[resources['ResourceName'] == u_resource]
-      # if at least 2 rows
-      if len(s_resource) > 2:
-        # sort by date descending
-        s_resource = s_resource.sort_values(by='Date', ascending=False)
-        # Keep the 1st row
-        s_resource = s_resource.iloc[0]
-        # Assigns value of tags to other rows with same resource
-        df.loc[df['ResourceName'] == u_resource, 'Tags'] = s_resource['Tags']
-        c += 1
-        if c % 1000 == 0:
-          msg = f'{c} resources processes...'
-          print(msg)
 #
 # ---------------------- main program
 def main():
@@ -196,17 +167,18 @@ def main():
   start = time.time()
 
   # === sera mis en parametres
-  csv_source_file = 'Detail_Enrollment_88991105_202401_en.csv'
+  csv_source_file = 'Detail_Enrollment_88991105_202404_en.csv'
 
-  # Retrieve directory of json file
+  # Check if Json file exists
   json_file =  os.path.join(os.path.dirname(__file__), JSON_FILE)
   if not os.path.isfile(json_file):
     print ('the file ' + json_file + ' was not found.')
     exit(1)
 
-  # voir pour récupérer le chemin du script
+  # Retrieve parameters from Json file
   parameters = read_json(json_file)
 
+  # --- Load source file and processing ---
   # Check if the source directory exists otherwise exit
   source_path = os.path.join(parameters['pathData'], parameters['pathDetailed'])
   if not os.path.exists(source_path):
@@ -219,39 +191,8 @@ def main():
     print ('the file ' + source_file + ' was not found.')
     exit(1)
 
-  # Check if the target directory exists otherwise creates it
-  target_path = os.path.join(parameters['pathData'], parameters['pathSynthesis'])
-  if not create_target_directory(target_path) :
-    print('Error : Error during the creation of the target directory.')
-    exit(1)
-
-  # Extract date from the file in format yyyymm
-  split_file = csv_source_file.split('_')
-  
-  # Retrieve year and month in format yyyymm
-  current_month = datetime.datetime.now().strftime('%Y%m')
-  
-  # Check if the source file is from current month
-  if split_file[3] == current_month:
-    # current month : process file without grouping
-    target_file = os.path.join(target_path, parameters['targetDaily'])
-    # Check if the target directory exists otherwise creates it
-    if not create_target_directory(target_file):
-      print('Error : Error during the creation of the target directory.')
-      exit(1)
-    # Create
-    target_file = os.path.join(target_file, re.sub('Detail', 'Daily', csv_source_file))
-    df = process_file(source_file, False)
-  else:
-    # process file grouping resources and calculating total cost
-    target_file = os.path.join(target_path, parameters['targetMonthly'])
-    # Check if the target directory exists otherwise creates it
-    if not create_target_directory(target_file):
-      print('Error : Error during the creation of the target directory.')
-      exit(1)
-    # Create file result
-    target_file = os.path.join(target_file, re.sub('Detail', 'Monthly', csv_source_file))
-    df = process_file(source_file, True)
+  # Load the source file
+  df = load_file(source_file, parameters['csvDetailedSeparator'])
 
   # Process in Billing Account
   account_file = os.path.join(parameters['pathData'], parameters['billingAccount'])
@@ -266,8 +207,8 @@ def main():
     print ('the file ' + profile_file + ' was not found.')
     exit(1)
   get_billing_profile(profile_file, df)
+
   # Drop columns BillingAccountName, BillingProfileName, BillingCurrency
-  # Voir si pertinent de supprimer comme le regroupement le fait
   df.drop(columns=['BillingAccountName', 'BillingProfileName', 'BillingCurrency'], inplace=True)
 
   # Extract SKU of VM in additionnalInfo column
@@ -278,12 +219,38 @@ def main():
 
   # Extract FinOps tags
   df['Tags'] = df['Tags'].apply(get_finops_tags, args=(parameters['finopsTags'],))
+  
+  # --- Write result file ---
+  # Check if the target directory exists otherwise creates it
+  target_path = os.path.join(parameters['pathData'], parameters['pathSynthesis'])
+  if not create_target_directory(target_path) :
+    print('Error : Error during the creation of the target directory.')
+    exit(1)
 
-  # Convert Date in date format
-  df['Date'] = pd.to_datetime(df['Date'], format = '%m/%d/%Y')
-
-  # Uniformize tags
-  uniformize_tags(df)
+  # Extract date from the file in format yyyymm
+  split_file = csv_source_file.split('_')
+  
+  # Retrieve year and month in format yyyymm
+  current_month = datetime.datetime.now().strftime('%Y%m')
+  
+  # if current month, process file without grouping
+  if split_file[3] == current_month:
+    target_file = os.path.join(target_path, parameters['targetDaily'])
+    # Check if the target directory exists otherwise creates it
+    if not create_target_directory(target_file):
+      print('Error : Error during the creation of the target directory.')
+      exit(1)
+    target_file = os.path.join(target_file, re.sub('Detail', 'Daily', csv_source_file))
+  # process file grouping resources and calculating total cost
+  else:
+    target_file = os.path.join(target_path, parameters['targetMonthly'])
+    # Check if the target directory exists otherwise creates it
+    if not create_target_directory(target_file):
+      print('Error : Error during the creation of the target directory.')
+      exit(1)
+    # Create file result
+    target_file = os.path.join(target_file, re.sub('Detail', 'Monthly', csv_source_file))
+    df = synthesis_file(df)
   
   # Write result file
   df.to_csv(target_file, sep=',', index=False)
