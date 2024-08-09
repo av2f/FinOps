@@ -278,7 +278,7 @@ def main():
   # Check if Json file exists
   json_file =  os.path.join(os.path.dirname(__file__), JSON_FILE)
   if not os.path.isfile(json_file):
-    print ('the file ' + json_file + ' was not found.')
+    print (f'the file {json_file} was not found.')
     exit(1)
 
   # Retrieve parameters from Json file
@@ -288,13 +288,13 @@ def main():
   # Check if the source directory exists otherwise exit
   source_path = os.path.join(parameters['pathData'], parameters['pathDetailed'])
   if not os.path.exists(source_path):
-    print('the directory ' + source_path + ' was not found.')
+    print(f'the directory {source_path} was not found.')
     exit(1)
   
   # Check if file exists
   source_file = os.path.join(source_path, csv_source_file)
   if not os.path.isfile(source_file):
-    print ('the file ' + source_file + ' was not found.')
+    print (f'the file {source_file} was not found.')
     exit(1)
 
   # Load the source file
@@ -303,14 +303,14 @@ def main():
   # Process in Billing Account
   account_file = os.path.join(parameters['pathData'], parameters['billingAccount'])
   if not os.path.isfile(account_file):
-    print ('the file ' + account_file + ' was not found.')
+    print (f'the file {account_file} was not found.')
     exit(1)
   get_billing_account(account_file, df)
 
   # Process in Billing Profile
   profile_file = os.path.join(parameters['pathData'], parameters['billingProfile'])
   if not os.path.isfile(profile_file):
-    print ('the file ' + profile_file + ' was not found.')
+    print (f'the file {profile_file} was not found.')
     exit(1)
   get_billing_profile(profile_file, df)
 
@@ -381,6 +381,6 @@ def main():
   
   # Calulate time execution
   duration = calculate_duration(start, end)
-  print ('Script executed in ' + duration)
+  print (f'Script executed in {duration}')
 
 main()
