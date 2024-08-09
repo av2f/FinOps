@@ -266,7 +266,6 @@ def set_finops_tag(tags, key_tag):
       if value:
         tag_value = str(value.group(1).strip())
   return tag_value
-
 #
 # ---------------------- main program
 def main():
