@@ -266,7 +266,7 @@ def set_finops_tag(tags, key_tag):
 
 def cleaning_retention_files(frequency, retention, path_files, extention_file):
   """
-  
+    PUT DESCRIPTION
   """
   dates = []
   files = os.listdir(path_files)
@@ -390,7 +390,7 @@ def main():
     df = synthesis_file(df, parameters['finopsTags'])
   else:
     # Daily = remove column BillingPeriodEndDate
-    df.drop(columns=['BillingPeriodEndDate'])
+    df.drop(columns=['BillingPeriodEndDate'], inplace=True)
 
   # Assigns values to finOps tags columns
   finops_tags = parameters['finopsTags'].split(',')
