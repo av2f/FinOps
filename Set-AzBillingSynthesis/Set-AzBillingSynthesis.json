@@ -4,10 +4,12 @@
   "csvDetailedSeparator": ",",
   "csvEncoding": "utf-8",
   "pathSynthesis": "Synthesis_Usage_charges",
-  "targetMonthly": "monthly",
-  "targetDaily" : "daily",
+  "targetMonthly": "Monthly",
+  "targetDaily" : "Daily",
   "billingAccount": "BillingAccount.csv",
   "billingProfile": "BillingProfile.csv",
   "additionalInfo": "ServiceType",
-  "finopsTags": "Environment,AIPCode,AIPName,AIPOwner,AIPCriticality,Customer,DepartmentName,Owner"
+  "finopsTags": "Environment,AIPCode,AIPName,AIPOwner,AIPCriticality,Customer,DepartmentName,Owner",
+  "retentionMonth": 12,
+  "retentionDay": 1
 }

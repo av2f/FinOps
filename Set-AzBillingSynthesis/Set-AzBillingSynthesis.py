@@ -17,9 +17,6 @@ import re
 import datetime
 import time
 
-# Declare constant
-JSON_FILE = 'Set-AzBillingSynthesis.json'
-
 def read_json(file):
   """
     Retrieves parameters in the Json parameters file
@@ -266,6 +263,32 @@ def set_finops_tag(tags, key_tag):
       if value:
         tag_value = str(value.group(1).strip())
   return tag_value
+
+def cleaning_retention_files(frequency, retention, path_files, extention_file):
+  """
+  
+  """
+  dates = []
+  files = os.listdir(path_files)
+  if len(files) > 0:
+    for file in files:
+      if file.startswith(frequency) and file.endswith(extention_file):
+        file_split = file.split('_')
+        # Retrieves date
+        dates.append(file_split[3])
+      else:
+        # Removes file because it is not matching with criteria
+        os.remove(os.path.join(path_files, file))
+    # if there are at least 1 file and more files than the retention, removes the oldest files
+    if len(dates) > 0:
+      dates.sort()
+      while len(dates) > retention:
+        for file in files:
+          if dates[0] in file:
+            # remove the file
+            os.remove(os.path.join(path_files, file))
+            del(dates[0])
+            break
 #
 # ---------------------- main program
 def main():
@@ -273,113 +296,126 @@ def main():
   start = time.time() # start of script execution
 
   # === sera mis en parametres
-  csv_source_file = 'Detail_Enrollment_88991105_202405_en.csv'
+  csv_source_file = 'Detail_Enrollment_88991105_202408_en.csv'
 
-  # Check if Json file exists
+  # Declares constant
+  JSON_FILE = 'Set-AzBillingSynthesis.json'
+  GROUPING = False
+    
+  # Checks if Json file exists
   json_file =  os.path.join(os.path.dirname(__file__), JSON_FILE)
   if not os.path.isfile(json_file):
     print (f'the file {json_file} was not found.')
     exit(1)
 
-  # Retrieve parameters from Json file
+  # Retrieves parameters from Json file
   parameters = read_json(json_file)
 
-  # --- Load source file and processing ---
-  # Check if the source directory exists otherwise exit
+  # Checks if the source directory exists otherwise exit
   source_path = os.path.join(parameters['pathData'], parameters['pathDetailed'])
   if not os.path.exists(source_path):
     print(f'the directory {source_path} was not found.')
     exit(1)
   
-  # Check if file exists
+  # Checks if source file exists
   source_file = os.path.join(source_path, csv_source_file)
   if not os.path.isfile(source_file):
     print (f'the file {source_file} was not found.')
     exit(1)
 
-  # Load the source file
+# Checks if the target directory exists otherwise creates it
+  target_path = os.path.join(parameters['pathData'], parameters['pathSynthesis'])
+  if not create_target_directory(target_path) :
+    print('Error : Error during the creation of the target directory.')
+    exit(1)
+
+  # Extracts date from the file in format yyyymm
+  split_file = csv_source_file.split('_')
+  
+  # Retrieves year and month in format yyyymm
+  current_month = datetime.datetime.now().strftime('%Y%m')
+  
+  # if current month, target file = daily
+  if split_file[3] == current_month:
+    target_file = os.path.join(target_path, parameters['targetDaily'])
+    # Checks if the target directory exists otherwise creates it
+    if not create_target_directory(target_file):
+      print('Error : Error during the creation of the target directory.')
+      exit(1)
+    target_file = os.path.join(target_file, re.sub('Detail', 'Daily', csv_source_file))
+  # otherwise target file = monthly
+  else:
+    target_file = os.path.join(target_path, parameters['targetMonthly'])
+    # Checks if the target directory exists otherwise creates it
+    if not create_target_directory(target_file):
+      print('Error : Error during the creation of the target directory.')
+      exit(1)
+    target_file = os.path.join(target_file, re.sub('Detail', 'Monthly', csv_source_file))
+    GROUPING = True
+  
+  # Loads the source file
   df = load_file(source_file, parameters['csvDetailedSeparator'], parameters['csvEncoding'])
 
-  # Process in Billing Account
+  # Processes in Billing Account
   account_file = os.path.join(parameters['pathData'], parameters['billingAccount'])
   if not os.path.isfile(account_file):
     print (f'the file {account_file} was not found.')
     exit(1)
   get_billing_account(account_file, df)
 
-  # Process in Billing Profile
+  # Processes in Billing Profile
   profile_file = os.path.join(parameters['pathData'], parameters['billingProfile'])
   if not os.path.isfile(profile_file):
     print (f'the file {profile_file} was not found.')
     exit(1)
   get_billing_profile(profile_file, df)
 
-  # Drop columns BillingAccountName, BillingProfileName, BillingCurrency
+  # Drops columns BillingAccountName, BillingProfileName, BillingCurrency
   df.drop(columns=['BillingAccountName', 'BillingProfileName', 'BillingCurrency'], inplace=True)
 
-  # Extract SKU of VM in additionnalInfo column
+  # Extracts SKU of VM in additionnalInfo column
   df['AdditionalInfo'] = df['AdditionalInfo'].apply(get_sku, args=(parameters['additionalInfo'],))
   
-  # Extract Reservation type in ProductOrderName
+  # Extracts Reservation type in ProductOrderName
   df['ProductOrderName'] = df['ProductOrderName'].apply(get_reservation_type)
 
-  # Add FinOps Tags in df
+  # Adds FinOps Tags in df
   df = set_finops_tags(df, parameters['finopsTags'])
 
-  # Extract FinOps tags
+  # Extracts FinOps tags
   df['Tags'] = df['Tags'].apply(get_finops_tags, args=(parameters['finopsTags'],))
 
-  # Grouping of rows
-  df = synthesis_file(df, parameters['finopsTags'])
+  if GROUPING:
+    # Monthly = Grouping of rows
+    df = synthesis_file(df, parameters['finopsTags'])
+  else:
+    # Daily = remove column BillingPeriodEndDate
+    df.drop(columns=['BillingPeriodEndDate'])
 
-  # Assign values to finOps tags columns
+  # Assigns values to finOps tags columns
   finops_tags = parameters['finopsTags'].split(',')
   for finops_tag in finops_tags:
     df[finops_tag] = df['Tags'].apply(set_finops_tag, args=(finops_tag,))
 
-  # Drop column 'Tags'
+  # Drops column 'Tags'
   df.drop(columns=['Tags'], inplace=True)
 
-  # --- Write result file ---
-  # Check if the target directory exists otherwise creates it
-  target_path = os.path.join(parameters['pathData'], parameters['pathSynthesis'])
-  if not create_target_directory(target_path) :
-    print('Error : Error during the creation of the target directory.')
-    exit(1)
-
-  # Extract date from the file in format yyyymm
-  split_file = csv_source_file.split('_')
-  
-  # Retrieve year and month in format yyyymm
-  current_month = datetime.datetime.now().strftime('%Y%m')
-  
-  # if current month, process file without grouping
-  if split_file[3] == current_month:
-    target_file = os.path.join(target_path, parameters['targetDaily'])
-    # Check if the target directory exists otherwise creates it
-    if not create_target_directory(target_file):
-      print('Error : Error during the creation of the target directory.')
-      exit(1)
-    target_file = os.path.join(target_file, re.sub('Detail', 'Daily', csv_source_file))
-  # process file grouping resources and calculating total cost
-  else:
-    target_file = os.path.join(target_path, parameters['targetMonthly'])
-    # Check if the target directory exists otherwise creates it
-    if not create_target_directory(target_file):
-      print('Error : Error during the creation of the target directory.')
-      exit(1)
-  
-  # Create file result
-  target_file = os.path.join(target_file, re.sub('Detail', 'Monthly', csv_source_file))
-  
-  # Write result file
+  # Writes result file
   df.to_csv(target_file, sep=',', index=False)
+  
+  # Cleaning files regarding retention declared in Json file
+  # Monthly files
+  path_to_remove = os.path.join(target_path, parameters['targetMonthly'])
+  cleaning_retention_files('Monthly', parameters['retentionMonth'], path_to_remove, '.csv')
+  # Daily files
+  path_to_remove = os.path.join(target_path, parameters['targetDaily'])
+  cleaning_retention_files('Daily', parameters['retentionDay'], path_to_remove, '.csv')
   
   print(target_file)
   
   end = time.time() # end of script execution
   
-  # Calulate time execution
+  # Calulates time execution
   duration = calculate_duration(start, end)
   print (f'Script executed in {duration}')
 
