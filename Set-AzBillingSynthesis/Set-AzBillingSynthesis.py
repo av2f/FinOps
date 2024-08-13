@@ -86,6 +86,18 @@ def load_file(source_file, separator, csv_encoding):
       'ProductOrderName', 'Term', 'ChargeType', 'PayGPrice', 'PricingModel'
   ])
 
+def set_daily_file(df, source_file, dailyNumberOfDays):
+  """
+  """
+  date_min = df['Date'].min()
+  date_max = df['Date'].max()
+
+  delta_days = ((date_max-date_min).days) + 1
+  
+  delta_days = (dailyNumberOfDays - delta_days) - 1
+
+  # A FINIR
+
 def synthesis_file(df, finops_tags):
   """
     Groups the dataframe by resources, calculating the total cost per row
@@ -355,6 +367,14 @@ def main():
   
   # Loads the source file
   df = load_file(source_file, parameters['csvDetailedSeparator'], parameters['csvEncoding'])
+
+  # Convert in date format the column Date
+  df['Date'] = pd.to_datetime(df['Date'])
+
+  # if daily file, checks if the daily number of days declared in the json file is matching
+  # if no, adds rows from previous month
+  if not GROUPING and parameters['dailyNumberOfDays'] > 0:
+    df = set_daily_file(df, source_file, parameters['dailyNumberOfDays'])
 
   # Processes in Billing Account
   account_file = os.path.join(parameters['pathData'], parameters['billingAccount'])

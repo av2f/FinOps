@@ -11,5 +11,6 @@
   "additionalInfo": "ServiceType",
   "finopsTags": "Environment,AIPCode,AIPName,AIPOwner,AIPCriticality,Customer,DepartmentName,Owner",
   "retentionMonth": 12,
-  "retentionDay": 1
+  "retentionDay": 1,
+  "dailyNumberOfDays": 30
 }
