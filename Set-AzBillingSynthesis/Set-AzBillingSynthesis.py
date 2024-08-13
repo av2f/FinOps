@@ -17,6 +17,16 @@ import re
 import datetime
 import time
 
+# Declare global constant
+DTYPE_DICT = {
+      'BillingAccountId': 'str', 'BillingAccountName': 'str', 'BillingPeriodEndDate': 'str', 'BillingProfileId': 'str', 'BillingProfileName': 'str',
+      'AccountOwnerId': 'str', 'AccountName': 'str', 'SubscriptionName': 'str', 'Date': 'str', 'MeterCategory': 'str', 'MeterSubCategory': 'str',
+      'MeterName': 'str', 'Cost': 'float64', 'UnitPrice': 'float64', 'BillingCurrency': 'str', 'ResourceLocation': 'str', 'ConsumedService': 'str',
+      'ResourceName': 'str', 'AdditionalInfo': 'str', 'Tags': 'str', 'CostCenter': 'str', 'ResourceGroup': 'str', 'ReservationName': 'str',
+      'ProductOrderName': 'str', 'Term': 'str', 'ChargeType': 'str', 'PayGPrice': 'float64', 'PricingModel': 'str'
+  }
+
+
 def read_json(file):
   """
     Retrieves parameters in the Json parameters file
@@ -93,8 +103,10 @@ def set_daily_file(df, source_file, dailyNumberOfDays):
   date_max = df['Date'].max()
 
   delta_days = ((date_max-date_min).days) + 1
-  
-  delta_days = (dailyNumberOfDays - delta_days) - 1
+
+  # if df has not the number of days
+  if delta_days < dailyNumberOfDays:
+    delta_days = (dailyNumberOfDays - delta_days) - 1
 
   # A FINIR
 
