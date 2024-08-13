@@ -17,7 +17,7 @@ import re
 import datetime
 import time
 
-# Declare global constant
+# ---- Declares global constant ----
 DTYPE_DICT = {
       'BillingAccountId': 'str', 'BillingAccountName': 'str', 'BillingPeriodEndDate': 'str', 'BillingProfileId': 'str', 'BillingProfileName': 'str',
       'AccountOwnerId': 'str', 'AccountName': 'str', 'SubscriptionName': 'str', 'Date': 'str', 'MeterCategory': 'str', 'MeterSubCategory': 'str',
@@ -25,7 +25,18 @@ DTYPE_DICT = {
       'ResourceName': 'str', 'AdditionalInfo': 'str', 'Tags': 'str', 'CostCenter': 'str', 'ResourceGroup': 'str', 'ReservationName': 'str',
       'ProductOrderName': 'str', 'Term': 'str', 'ChargeType': 'str', 'PayGPrice': 'float64', 'PricingModel': 'str'
   }
+COLUMNS = [
+      'BillingAccountId', 'BillingAccountName', 'BillingPeriodEndDate', 'BillingProfileId', 'BillingProfileName',
+      'AccountOwnerId', 'AccountName', 'SubscriptionName', 'Date', 'MeterCategory', 'MeterSubCategory',
+      'MeterName', 'Cost', 'UnitPrice',	'BillingCurrency', 'ResourceLocation', 'ConsumedService',
+      'ResourceName', 'AdditionalInfo', 'Tags', 'CostCenter', 'ResourceGroup', 'ReservationName',
+      'ProductOrderName', 'Term', 'ChargeType', 'PayGPrice', 'PricingModel'
+  ]
+JSON_FILE = 'Set-AzBillingSynthesis.json'
+GROUPING = False
 
+
+# ---- Declares functions ----
 
 def read_json(file):
   """
@@ -70,35 +81,13 @@ def calculate_duration(start, end):
   time_elapse = time.gmtime(end-start)
   return time.strftime('%Hh:%Mm:%Ss', time_elapse)
 
-def load_file(source_file, separator, csv_encoding):
+def set_daily_file(df, source_path, source_file, dailyNumberOfDays, csv_separator, csv_encoding):
   """
-    Loads the csv source_file in dataframe filering columns
-    Input:
-      - source_file: the csv file to be loaded
-      - separator: separator used in the csv file (defined in the Json file)
-      - csv_encoding: encoding of the file (defined in the Json file)
-    Output: 
-      - pandas dataframe
+    PUT DESCRIPTION
   """
-  dtype_dict = {
-      'BillingAccountId': 'str', 'BillingAccountName': 'str', 'BillingPeriodEndDate': 'str', 'BillingProfileId': 'str', 'BillingProfileName': 'str',
-      'AccountOwnerId': 'str', 'AccountName': 'str', 'SubscriptionName': 'str', 'Date': 'str', 'MeterCategory': 'str', 'MeterSubCategory': 'str',
-      'MeterName': 'str', 'Cost': 'float64', 'UnitPrice': 'float64', 'BillingCurrency': 'str', 'ResourceLocation': 'str', 'ConsumedService': 'str',
-      'ResourceName': 'str', 'AdditionalInfo': 'str', 'Tags': 'str', 'CostCenter': 'str', 'ResourceGroup': 'str', 'ReservationName': 'str',
-      'ProductOrderName': 'str', 'Term': 'str', 'ChargeType': 'str', 'PayGPrice': 'float64', 'PricingModel': 'str'
-  }
+  global DTYPE_DICT
+  global COLUMNS
 
-  return pd.read_csv(source_file, dtype=dtype_dict, sep=separator, encoding=csv_encoding, usecols=[
-      'BillingAccountId', 'BillingAccountName', 'BillingPeriodEndDate', 'BillingProfileId', 'BillingProfileName',
-      'AccountOwnerId', 'AccountName', 'SubscriptionName', 'Date', 'MeterCategory', 'MeterSubCategory',
-      'MeterName', 'Cost', 'UnitPrice',	'BillingCurrency', 'ResourceLocation', 'ConsumedService',
-      'ResourceName', 'AdditionalInfo', 'Tags', 'CostCenter', 'ResourceGroup', 'ReservationName',
-      'ProductOrderName', 'Term', 'ChargeType', 'PayGPrice', 'PricingModel'
-  ])
-
-def set_daily_file(df, source_file, dailyNumberOfDays):
-  """
-  """
   date_min = df['Date'].min()
   date_max = df['Date'].max()
 
@@ -106,9 +95,37 @@ def set_daily_file(df, source_file, dailyNumberOfDays):
 
   # if df has not the number of days
   if delta_days < dailyNumberOfDays:
+    # Calculates the number of days to retrieve from previous month
     delta_days = (dailyNumberOfDays - delta_days) - 1
+    
+    # searches name of file from previous month and extracts data
+    split_file = source_file.split('_')
+    int_date = int(split_file[3]) - 1
+    previous_file = re.sub(split_file[3], str(int_date), source_file)
+    previous_file = os.path.join(source_path, previous_file)
+    print(f'previous file = {previous_file}')
+    if not os.path.isfile(previous_file):
+      print (f'the file {previous_file} was not found. Impossible to retrieve data for daily file.')
+    else:
+      df_previous = pd.read_csv(previous_file, dtype=DTYPE_DICT, sep=csv_separator, encoding=csv_encoding, usecols=COLUMNS)
+      df_previous['Date'] = pd.to_datetime(df_previous['Date'])
+      
+      # defines last date from df_previous and start date
+      end_date = df_previous['Date'].max()
+      start_date = end_date - datetime.timedelta(days=delta_days)
+      filter = (df_previous['Date'] >= start_date) & (df_previous['Date'] <= end_date)
+      
+      # Extracts data 
+      df_previous = df_previous.loc[filter]
 
-  # A FINIR
+      # Concatenates df and df_previous
+      df = pd.concat([df, df_previous])
+
+      # Removes df_previous
+      del(df_previous)
+  
+  return df
+
 
 def synthesis_file(df, finops_tags):
   """
@@ -136,14 +153,13 @@ def get_billing_account(csvfile, df):
     Output: 
       - csvfile updated
   """
-  # Put description
   billing_csv = [] 
   ba = df[['BillingAccountId', 'BillingAccountName']]
   # Retrieve the billing_id
   billing_ids = ba['BillingAccountId'].unique()
   # 
   with open(csvfile, newline='') as f:
-    reader = csv.reader(f, delimiter = ';')
+    reader = csv.reader(f, delimiter = ',')
     next(reader)  # skip the header row
     for row in reader:
         billing_csv.append(row[0])
@@ -153,14 +169,14 @@ def get_billing_account(csvfile, df):
       if item not in billing_csv:
         billing_id = ba[ba['BillingAccountId'] == item].iloc[0].tolist()
         with open(csvfile, 'a', newline='') as f:
-          writer = csv.writer(f, delimiter=';')
+          writer = csv.writer(f, delimiter=',')
           writer.writerow(billing_id)
   # else write all billing account
   else:
       for item in billing_ids:
         billing_id = ba[ba['BillingAccountId'] == item].iloc[0].tolist()
         with open(csvfile, 'a', newline='') as f:
-          writer = csv.writer(f, delimiter=';')
+          writer = csv.writer(f, delimiter=',')
           writer.writerow(billing_id)
 
 def get_billing_profile(csvfile, df):
@@ -172,14 +188,13 @@ def get_billing_profile(csvfile, df):
     Output: 
       - csvfile updated
   """
-  # Put description
   billing_csv = [] 
   bp = df[['BillingProfileId', 'BillingProfileName', 'BillingCurrency']]
   # Retrieve the billing_id
   billing_ids = bp['BillingProfileId'].unique()
   # 
   with open(csvfile, newline='') as f:
-    reader = csv.reader(f, delimiter = ';')
+    reader = csv.reader(f, delimiter = ',')
     next(reader)  # skip the header row
     for row in reader:
       billing_csv.append(row[0])
@@ -189,14 +204,14 @@ def get_billing_profile(csvfile, df):
       if item not in billing_csv:
         billing_id = bp[bp['BillingProfileId'] == item].iloc[0].tolist()
         with open(csvfile, 'a', newline='') as f:
-          writer = csv.writer(f, delimiter=';')
+          writer = csv.writer(f, delimiter=',')
           writer.writerow(billing_id)
   # else write all billing account
   else:
       for item in billing_ids:
         billing_id = bp[bp['BillingProfileId'] == item].iloc[0].tolist()
         with open(csvfile, 'a', newline='') as f:
-          writer = csv.writer(f, delimiter=';')
+          writer = csv.writer(f, delimiter=',')
           writer.writerow(billing_id)
 
 def get_sku(info, criteria):
@@ -314,7 +329,7 @@ def cleaning_retention_files(frequency, retention, path_files, extention_file):
             del(dates[0])
             break
 #
-# ---------------------- main program
+# ---- Main program ----
 def main():
 
   start = time.time() # start of script execution
@@ -322,9 +337,10 @@ def main():
   # === sera mis en parametres
   csv_source_file = 'Detail_Enrollment_88991105_202408_en.csv'
 
-  # Declares constant
-  JSON_FILE = 'Set-AzBillingSynthesis.json'
-  GROUPING = False
+  global JSON_FILE
+  global GROUPING
+  global DTYPE_DICT
+  global COLUMNS
     
   # Checks if Json file exists
   json_file =  os.path.join(os.path.dirname(__file__), JSON_FILE)
@@ -378,7 +394,9 @@ def main():
     GROUPING = True
   
   # Loads the source file
-  df = load_file(source_file, parameters['csvDetailedSeparator'], parameters['csvEncoding'])
+  df = pd.read_csv(source_file, dtype=DTYPE_DICT, sep=parameters['csvDetailedSeparator'],
+    encoding=parameters['csvEncoding'], usecols=COLUMNS
+  )
 
   # Convert in date format the column Date
   df['Date'] = pd.to_datetime(df['Date'])
@@ -386,7 +404,7 @@ def main():
   # if daily file, checks if the daily number of days declared in the json file is matching
   # if no, adds rows from previous month
   if not GROUPING and parameters['dailyNumberOfDays'] > 0:
-    df = set_daily_file(df, source_file, parameters['dailyNumberOfDays'])
+    df = set_daily_file(df, source_path, csv_source_file, parameters['dailyNumberOfDays'], parameters['csvDetailedSeparator'], parameters['csvEncoding'])
 
   # Processes in Billing Account
   account_file = os.path.join(parameters['pathData'], parameters['billingAccount'])
