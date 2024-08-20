@@ -106,14 +106,19 @@ function SearchResource()
   <#
     Search if resource $resource in the Resource Group $resourceGroupName and type of resource $resourceType exists in $listResources
     Input:
-      - $resourceId: Resource Id
-      - $listResources: List of of resources
+      - $resourceGroupName: $ResourceGroupName
+      - $resourceType: $resourceType
+      - $resource: $Resource
+      - $listResources: List of VMs
     Output: 
       - $cost: Cost in Decimal format of the VM
       - $costUsd: Cost USD in Decimal format of the format
       - $Found: Boolean. $true if VM has been found, else return $false.
   #>
   param(
+    # [string]$resourceGroupName,
+    # [string]$resourceType,
+    # [string]$resource,
     [string]$resourceId,
     [object[]]$listResources
   )
@@ -132,39 +137,6 @@ function SearchResource()
   }
 
   return [Decimal]$cost, [Decimal]$costUsd, $found
-}
-
-function GetResourceId()
-{
-  <#
-    Search if resource $resource in the Resource Group $resourceGroupName and type of resource $resourceType exists in $listResources
-    Input:
-      - $resourceType: type of resource to search defined in the Json file parameter
-      - $listResources: List of resources
-    Output: 
-      - $resourcesId: list of Resource ID filtered following the type
-  #>
-  param(
-    [string]$resourceType,
-    [object[]]$listResources
-  )
-
-  $resourcesId = @()
-
-  if ($resourceType.ToLower() -ne "all") {
-    $listTypes = $resourceType.split(",")
-  }
-
-  foreach ($resource in $listResources) {
-    if ($resourceType.ToLower() -eq "all") {
-      $resourcesId += $resource.ResourceId
-    }
-    elseif ($resource.ResourceType -cin $listTypes) {
-      $resourcesId += $resource.ResourceId
-    }
-  }
-
-  return $resourcesId
 }
 
 function SetObjResult {
@@ -216,24 +188,11 @@ if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Starting processi
 Write-Host "INFO: Starting processing..."
 
 $filePreviousMonth = $globalVar.workPath + $globalVar.filePreviousMonth
-if (-not (Test-Path $filePreviousMonth -PathType leaf)) {
-  if ($globalLog) { (WriteLog -fileName $logfile -message "Error: the file $filePrevious is not available.") }
-  Write-Host "Error: the file $filePrevious is not available."
-  exit 1
-}
-
 $fileCurrentMonth = $globalVar.workPath + $globalVar.fileCurrentMonth
-if (-not (Test-Path $fileCurrentMonth -PathType leaf)) {
-  if ($globalLog) { (WriteLog -fileName $logfile -message "Error: the file $fileCurrentMonth is not available.") }
-  Write-Host "Error: the file $fileCurrentMonth is not available."
-  exit 1
-}
 
 if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Compare files $filePreviousMonth & $fileCurrentMonth.") }
 
 $variationCost = @()
-$resourceIdPreviousMonth = @()
-$resourceIdCurrentMonth = @()
 
 # Retrieve data from file M-1
 $listPreviousMonth = Import-Csv -Path $filePreviousMonth -Delimiter "," | Select-Object -Property Resource, ResourceId, ResourceType,
@@ -242,51 +201,38 @@ ResourceGroupName, ResourceLocation, SubscriptionName, Cost, CostUSD, Currency
 $listCurrentMonth = Import-Csv -Path $fileCurrentMonth -Delimiter "," | Select-Object -Property Resource, ResourceId, ResourceType,
 ResourceGroupName, ResourceLocation, SubscriptionName, Cost, CostUSD, Currency
 
-# Retrieves Resources ID of previous month following types defined in the json file parameter
-$resourceIdPreviousMonth = GetResourceId -listResources $listPreviousMonth -resourceType $globalVar.type
-# Retrieves Resources ID of current month following types defined in the json file parameter
-$resourceIdCurrentMonth = GetResourceId -listResources $listCurrentMonth -resourceType $globalVar.type
-
 $countResource = 0
-foreach ($resource in $resourceIdPreviousMonth) {
+foreach ($resource in $listPreviousMonth) {
   
-  $resourceIdPreviousMonth = $listPreviousMonth | Where-Object -Property ResourceId -eq $resource |
-  Select-Object -Property Resource, ResourceId, ResourceType, ResourceGroupName, ResourceLocation, SubscriptionName, Cost, CostUSD, Currency
-  
-  $costPrevMonth = [Decimal]$resourceIdPreviousMonth.Cost
-  $costPrevMonthUsd = [Decimal]$resourceIdPreviousMonth.CostUSD
+  $costPrevMonth = [Decimal]$resource.Cost
+  $costPrevMonthUsd = [Decimal]$resource.CostUSD
 
   # Search if resource in M-1 exists in M and retrieve costs
   # ($cost, $costUsd, $found) = SearchResource -resourceGroupName $resource.ResourceGroupName -resourceType $resource.ResourceType -resource $resource.resource -listResources $listCurrentMonth
-  ($cost, $costUsd, $found) = SearchResource -resourceId $resource -listResources $listCurrentMonth
+  ($cost, $costUsd, $found) = SearchResource -resourceId $resource.ResourceId -listResources $listCurrentMonth
 
   # Calculate variation USD cost and Variation in percent
   $variationCostUsd = $costUsd - $costPrevMonthUsd
   $variationPercentUsd = ""
   if ($costPrevMonthUsd -gt 0) {
-    [Decimal]$variationPercentUsd = (($costUsd - $costPrevMonthUsd)/$costPrevMonthUsd)*100
+    $variationPercentUsd = (($costUsd - $costPrevMonthUsd)/$costPrevMonthUsd)*100
   }
   
   $variationCost += SetObjResult @(
-    $resourceIdPreviousMonth.SubscriptionName, $resourceIdPreviousMonth.ResourceGroupName, $resourceIdPreviousMonth.Resource, $resourceIdPreviousMonth.ResourceType,
-    $resourceIdPreviousMonth.ResourceLocation, $costPrevMonth, $cost, $resourceIdPreviousMonth.Currency, $costPrevMonthUsd, $costUsd, $variationCostUsd, $variationPercentUsd
+    $resource.SubscriptionName, $resource.ResourceGroupName, $resource.Resource, $resource.ResourceType, $resource.ResourceLocation,
+    $costPrevMonth, $cost, $resource.Currency, $costPrevMonthUsd, $costUsd, $variationCostUsd, $variationPercentUsd
   )
   $countResource += 1
 }
 
 # Search new VMs that exist in M and not in M-1
-foreach ($resource in $resourceIdCurrentMonth) {
-
-  $resourceIdCurrentMonth = $listCurrentMonth | Where-Object -Property ResourceId -eq $resource |
-  Select-Object -Property Resource, ResourceId, ResourceType, ResourceGroupName, ResourceLocation, SubscriptionName, Cost, CostUSD, Currency
-
+foreach ($resource in $listCurrentMonth) {
   # ($cost, $costUsd, $found) = SearchResource -resourceGroupName $resource.ResourceGroupName -resourceType $resource.ResourceType -resource $resource.resource -listResources $listPreviousMonth
-  ($cost, $costUsd, $found) = SearchResource -resourceId $resource -listResources $listPreviousMonth
+  ($cost, $costUsd, $found) = SearchResource -resourceId $resource.ResourceId -listResources $listPreviousMonth
   if (-not $found) {
     $variationCost += SetObjResult @(
-      $resourceIdCurrentMonth.SubscriptionName, $resourceIdCurrentMonth.ResourceGroupName, $resourceIdCurrentMonth.Resource,
-      $resourceIdCurrentMonth.ResourceType, $resourceIdCurrentMonth.ResourceLocation,
-      0, $resourceIdCurrentMonth.Cost, $resourceIdCurrentMonth.Currency, 0, $resourceIdCurrentMonth.CostUSD, $resourceIdCurrentMonth.CostUSD,""
+      $resource.SubscriptionName, $resource.ResourceGroupName, $resource.Resource, $resource.ResourceType, $resource.ResourceLocation,
+      0, $resource.Cost, $resource.Currency, 0, $resource.CostUSD, $resource.CostUSD,""
     )
     $countResource += 1
   }
