@@ -1,12 +1,12 @@
 <#
-  Name    : Get-AzVmCostVariation.ps1
+  Name    : Get-AzCostVariation.ps1
   Author  : Frederic Parmentier
   Version : 1.0
-  Creation Date : 07/16/2024
+  Creation Date : 08/19/2024
   
-  Compare costs of Virtual Machines between M-1 and M and calculate USD Cost Variation and variation in percentage.
+  Compare costs of resources between M-1 and M and calculate USD Cost Variation and variation in percentage.
   
-  Global variables are stored in .\Get-AzVmCostVariation.json and must be adapted accordingly
+  Global variables are stored in .\Get-AzCostVariation.json and must be adapted accordingly
 #>
 
 <# -----------
@@ -23,7 +23,7 @@ Set-Item -Path Env:\SuppressAzurePowerShellBreakingChangeWarnings -Value $true
   Declare global variables, arrays and objects
 ----------- #>
 # Retrieve global variables from json file
-$globalVar = Get-Content -Raw -Path "$($PSScriptRoot)\Get-AzVmCostVariation.json" | ConvertFrom-Json
+$globalVar = Get-Content -Raw -Path "$($PSScriptRoot)\Get-AzCostVariation.json" | ConvertFrom-Json
 $globalChronoFile = (Get-Date -Format "MMddyyyyHHmmss") # Format for file with chrono
 $globalLog = $false # set to $true if generateLogFile in json file is set to "Y"
 
@@ -104,34 +104,38 @@ function WriteLog
 function SearchResource()
 {
   <#
-    Search if VM $resource in the Resource Group $resourceGroupName exists in $listVms
+    Search if resource $resource in the Resource Group $resourceGroupName and type of resource $resourceType exists in $listResources
     Input:
-      - $resourceGroupName : $ResourceGroupName
-      - $resource : $Resource
-      - $listVms : List of VMs
+      - $resourceGroupName: $ResourceGroupName
+      - $resourceType: $resourceType
+      - $resource: $Resource
+      - $listResources: List of VMs
     Output: 
-      - $cost : Cost in Decimal format of the VM
-      - $costUsd : Cost USD in Decimal format of the format
-      - $Found : Boolean. $true if VM has been found, else return $false.
+      - $cost: Cost in Decimal format of the VM
+      - $costUsd: Cost USD in Decimal format of the format
+      - $Found: Boolean. $true if VM has been found, else return $false.
   #>
   param(
-    [string]$resourceGroupName,
-    [string]$resource,
-    [object[]]$listVms
+    # [string]$resourceGroupName,
+    # [string]$resourceType,
+    # [string]$resource,
+    [string]$resourceId,
+    [object[]]$listResources
   )
 
   $cost = 0
   $costUsd = 0
   $found = $false
-
-  foreach($vm in $listVms) {
-    if ($vm.ResourceGroupName -eq $resourceGroupName -and $vm.Resource -eq $resource) {
-      $cost = $vm.Cost
-      $costUsd = $vm.CostUSD
+  
+  foreach($res in $listResources) {
+    if ($res.ResourceId -eq $resourceId) {
+      $cost = $res.Cost
+      $costUsd = $res.CostUSD
       $found = $true
       break
     }
   }
+
   return [Decimal]$cost, [Decimal]$costUsd, $found
 }
 
@@ -159,8 +163,8 @@ function SetObjResult {
       'Currency' = $listResult[7]
       'Cost USD M-1' = $listResult[8]
       'Cost USD M' = $listResult[9]
-      'Cost Variation USD' = $listResult[10]
-      'Variation in Percent USD' = $listResult[11]
+      'Cost Variation (USD)' = $listResult[10]
+      'Variation in Percent (USD)' = $listResult[11]
     }
   )
   return $objResult
@@ -191,39 +195,44 @@ if ($globalLog) { (WriteLog -fileName $logfile -message "INFO: Compare files $fi
 $variationCost = @()
 
 # Retrieve data from file M-1
-$listPreviousMonth = Import-Csv -Path $filePreviousMonth -Delimiter "," | Where-Object -Property ResourceType -eq  $($globalVar.type) |
-Select-Object -Property Resource, ResourceType, ResourceGroupName, ResourceLocation, SubscriptionName, Cost, CostUSD, Currency
+$listPreviousMonth = Import-Csv -Path $filePreviousMonth -Delimiter "," | Select-Object -Property Resource, ResourceId, ResourceType,
+ResourceGroupName, ResourceLocation, SubscriptionName, Cost, CostUSD, Currency
 # Retrieve data from file M
-$listCurrentMonth = Import-Csv -Path $fileCurrentMonth -Delimiter "," | Where-Object -Property ResourceType -eq  $($globalVar.type) |
-Select-Object -Property Resource, ResourceType, ResourceGroupName, ResourceLocation, SubscriptionName, Cost, CostUSD, Currency
+$listCurrentMonth = Import-Csv -Path $fileCurrentMonth -Delimiter "," | Select-Object -Property Resource, ResourceId, ResourceType,
+ResourceGroupName, ResourceLocation, SubscriptionName, Cost, CostUSD, Currency
 
 $countResource = 0
-foreach ($vm in $listPreviousMonth) {
+foreach ($resource in $listPreviousMonth) {
   
-  $costPrevMonth = [Decimal]$vm.Cost
-  $costPrevMonthUsd = [Decimal]$vm.CostUSD
-  
-  # Search if VM in M-1 exists in M and retrieve costs
-  ($cost, $costUsd, $found) = SearchResource -resourceGroupName $vm.ResourceGroupName -resource $vm.resource -listVms $listCurrentMonth
-    
+  $costPrevMonth = [Decimal]$resource.Cost
+  $costPrevMonthUsd = [Decimal]$resource.CostUSD
+
+  # Search if resource in M-1 exists in M and retrieve costs
+  # ($cost, $costUsd, $found) = SearchResource -resourceGroupName $resource.ResourceGroupName -resourceType $resource.ResourceType -resource $resource.resource -listResources $listCurrentMonth
+  ($cost, $costUsd, $found) = SearchResource -resourceId $resource.ResourceId -listResources $listCurrentMonth
+
   # Calculate variation USD cost and Variation in percent
   $variationCostUsd = $costUsd - $costPrevMonthUsd
-  $variationPercentUsd = (($costUsd - $costPrevMonthUsd)/$costPrevMonthUsd)*100
+  $variationPercentUsd = ""
+  if ($costPrevMonthUsd -gt 0) {
+    $variationPercentUsd = (($costUsd - $costPrevMonthUsd)/$costPrevMonthUsd)*100
+  }
   
   $variationCost += SetObjResult @(
-    $vm.SubscriptionName, $vm.ResourceGroupName, $vm.Resource, $vm.ResourceType, $vm.ResourceLocation,
-    $costPrevMonth, $cost, $vm.Currency, $costPrevMonthUsd, $costUsd, $variationCostUsd, $variationPercentUsd
+    $resource.SubscriptionName, $resource.ResourceGroupName, $resource.Resource, $resource.ResourceType, $resource.ResourceLocation,
+    $costPrevMonth, $cost, $resource.Currency, $costPrevMonthUsd, $costUsd, $variationCostUsd, $variationPercentUsd
   )
   $countResource += 1
 }
 
 # Search new VMs that exist in M and not in M-1
-foreach ($vm in $listCurrentMonth) {
-  ($cost, $costUsd, $found) = SearchResource -resourceGroupName $vm.ResourceGroupName -resource $vm.resource -listVms $listPreviousMonth
+foreach ($resource in $listCurrentMonth) {
+  # ($cost, $costUsd, $found) = SearchResource -resourceGroupName $resource.ResourceGroupName -resourceType $resource.ResourceType -resource $resource.resource -listResources $listPreviousMonth
+  ($cost, $costUsd, $found) = SearchResource -resourceId $resource.ResourceId -listResources $listPreviousMonth
   if (-not $found) {
     $variationCost += SetObjResult @(
-      $vm.SubscriptionName, $vm.ResourceGroupName, $vm.Resource, $vm.ResourceType, $vm.ResourceLocation,
-      0, 0, $vm.Currency, 0, $costUsd, $costUsd, 100
+      $resource.SubscriptionName, $resource.ResourceGroupName, $resource.Resource, $resource.ResourceType, $resource.ResourceLocation,
+      0, $resource.Cost, $resource.Currency, 0, $resource.CostUSD, $resource.CostUSD,""
     )
     $countResource += 1
   }

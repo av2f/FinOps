@@ -1,9 +1,0 @@
-{
-  "workPath": "C:/Users/fparment/Documents/AzFinOps/Data/TotalCostManagement/",
-  "filePreviousMonth": "CostManagement_M-1.csv",
-  "fileCurrentMonth": "CostManagement_M.csv",
-  "fileResult": "Get-AzVmCostVariation",
-  "chronoFile": "N",
-  "generateLogFile": "Y",
-  "type": "Virtual machine"
-}

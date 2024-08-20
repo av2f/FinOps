@@ -103,7 +103,6 @@ def set_daily_file(df, source_path, source_file, dailyNumberOfDays, csv_separato
     int_date = int(split_file[3]) - 1
     previous_file = re.sub(split_file[3], str(int_date), source_file)
     previous_file = os.path.join(source_path, previous_file)
-    print(f'previous file = {previous_file}')
     if not os.path.isfile(previous_file):
       print (f'the file {previous_file} was not found. Impossible to retrieve data for daily file.')
     else:
