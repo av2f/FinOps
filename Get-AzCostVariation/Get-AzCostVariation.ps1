@@ -110,7 +110,6 @@ function SearchResource()
       - $listResources: List of of resources
     Output: 
       - $cost: Cost in Decimal format of the VM
-      - $costUsd: Cost USD in Decimal format of the format
       - $Found: Boolean. $true if VM has been found, else return $false.
   #>
   param(
@@ -119,19 +118,17 @@ function SearchResource()
   )
 
   $cost = 0
-  $costUsd = 0
   $found = $false
   
   foreach($res in $listResources) {
     if ($res.ResourceId -eq $resourceId) {
       $cost = $res.Cost
-      $costUsd = $res.CostUSD
       $found = $true
       break
     }
   }
 
-  return [Decimal]$cost, [Decimal]$costUsd, $found
+  return [Decimal]$cost, $found
 }
 
 function GetResourceId()
@@ -176,8 +173,8 @@ function SetObjResult {
   param(
     [array]$listResult
   )
-  if ($listResult.Count -ne 12) {
-    $listResult = @('-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-')
+  if ($listResult.Count -ne 10) {
+    $listResult = @('-', '-', '-', '-', '-', '-', '-', '-', '-', '-')
   }
   $objResult = @(
     [PSCustomObject]@{
@@ -189,10 +186,8 @@ function SetObjResult {
       'Cost M-1' = $listResult[5]
       'Cost M' = $listResult[6]
       'Currency' = $listResult[7]
-      'Cost USD M-1' = $listResult[8]
-      'Cost USD M' = $listResult[9]
-      'Cost Variation (USD)' = $listResult[10]
-      'Variation in Percent (USD)' = $listResult[11]
+      'Cost Variation' = $listResult[8]
+      'Variation in Percent' = $listResult[9]
     }
   )
   return $objResult
@@ -237,10 +232,10 @@ $resourceIdCurrentMonth = @()
 
 # Retrieve data from file M-1
 $listPreviousMonth = Import-Csv -Path $filePreviousMonth -Delimiter "," | Select-Object -Property Resource, ResourceId, ResourceType,
-ResourceGroupName, ResourceLocation, SubscriptionName, Cost, CostUSD, Currency
+ResourceGroupName, ResourceLocation, SubscriptionName, Cost, Currency
 # Retrieve data from file M
 $listCurrentMonth = Import-Csv -Path $fileCurrentMonth -Delimiter "," | Select-Object -Property Resource, ResourceId, ResourceType,
-ResourceGroupName, ResourceLocation, SubscriptionName, Cost, CostUSD, Currency
+ResourceGroupName, ResourceLocation, SubscriptionName, Cost, Currency
 
 # Retrieves Resources ID of previous month following types defined in the json file parameter
 $resourceIdPreviousMonth = GetResourceId -listResources $listPreviousMonth -resourceType $globalVar.type
@@ -251,25 +246,23 @@ $countResource = 0
 foreach ($resource in $resourceIdPreviousMonth) {
   
   $resourceIdPreviousMonth = $listPreviousMonth | Where-Object -Property ResourceId -eq $resource |
-  Select-Object -Property Resource, ResourceId, ResourceType, ResourceGroupName, ResourceLocation, SubscriptionName, Cost, CostUSD, Currency
+  Select-Object -Property Resource, ResourceId, ResourceType, ResourceGroupName, ResourceLocation, SubscriptionName, Cost, Currency
   
   $costPrevMonth = [Decimal]$resourceIdPreviousMonth.Cost
-  $costPrevMonthUsd = [Decimal]$resourceIdPreviousMonth.CostUSD
 
   # Search if resource in M-1 exists in M and retrieve costs
-  # ($cost, $costUsd, $found) = SearchResource -resourceGroupName $resource.ResourceGroupName -resourceType $resource.ResourceType -resource $resource.resource -listResources $listCurrentMonth
-  ($cost, $costUsd, $found) = SearchResource -resourceId $resource -listResources $listCurrentMonth
+  ($cost, $found) = SearchResource -resourceId $resource -listResources $listCurrentMonth
 
-  # Calculate variation USD cost and Variation in percent
-  $variationCostUsd = $costUsd - $costPrevMonthUsd
-  $variationPercentUsd = ""
-  if ($costPrevMonthUsd -gt 0) {
-    [Decimal]$variationPercentUsd = (($costUsd - $costPrevMonthUsd)/$costPrevMonthUsd)*100
+  # Calculate variation cost and Variation in percent
+  [Decimal]$varCost = $cost - $costPrevMonth
+  $varPercent = ""
+  if ($costPrevMonth -gt 0) {
+    [Decimal]$varPercent = (($cost - $costPrevMonth)/$costPrevMonth)*100
   }
   
   $variationCost += SetObjResult @(
     $resourceIdPreviousMonth.SubscriptionName, $resourceIdPreviousMonth.ResourceGroupName, $resourceIdPreviousMonth.Resource, $resourceIdPreviousMonth.ResourceType,
-    $resourceIdPreviousMonth.ResourceLocation, $costPrevMonth, $cost, $resourceIdPreviousMonth.Currency, $costPrevMonthUsd, $costUsd, $variationCostUsd, $variationPercentUsd
+    $resourceIdPreviousMonth.ResourceLocation, $costPrevMonth, $cost, $resourceIdPreviousMonth.Currency, $varCost, $varPercent
   )
   $countResource += 1
 }
@@ -278,15 +271,14 @@ foreach ($resource in $resourceIdPreviousMonth) {
 foreach ($resource in $resourceIdCurrentMonth) {
 
   $resourceIdCurrentMonth = $listCurrentMonth | Where-Object -Property ResourceId -eq $resource |
-  Select-Object -Property Resource, ResourceId, ResourceType, ResourceGroupName, ResourceLocation, SubscriptionName, Cost, CostUSD, Currency
+  Select-Object -Property Resource, ResourceId, ResourceType, ResourceGroupName, ResourceLocation, SubscriptionName, Cost, Currency
 
-  # ($cost, $costUsd, $found) = SearchResource -resourceGroupName $resource.ResourceGroupName -resourceType $resource.ResourceType -resource $resource.resource -listResources $listPreviousMonth
-  ($cost, $costUsd, $found) = SearchResource -resourceId $resource -listResources $listPreviousMonth
+  ($cost, $found) = SearchResource -resourceId $resource -listResources $listPreviousMonth
   if (-not $found) {
     $variationCost += SetObjResult @(
       $resourceIdCurrentMonth.SubscriptionName, $resourceIdCurrentMonth.ResourceGroupName, $resourceIdCurrentMonth.Resource,
       $resourceIdCurrentMonth.ResourceType, $resourceIdCurrentMonth.ResourceLocation,
-      0, $resourceIdCurrentMonth.Cost, $resourceIdCurrentMonth.Currency, 0, $resourceIdCurrentMonth.CostUSD, $resourceIdCurrentMonth.CostUSD,""
+      0, $resourceIdCurrentMonth.Cost, $resourceIdCurrentMonth.Currency, $resourceIdCurrentMonth.Cost, ""
     )
     $countResource += 1
   }

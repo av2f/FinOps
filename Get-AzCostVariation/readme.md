@@ -2,7 +2,7 @@ Name    : Get-AzCostVariation.ps1
 Version : 1.0
 
 ** Description **
-Calculates the cost variation in USD and the variation in percent between M-1 and M resources costs
+Calculates the cost variation and the variation in percent between M-1 and M resources costs
 
 Global variables are stored in .\Get-AzCostVariation.json and must be adapted accordingly
 
@@ -51,10 +51,8 @@ ResourceLocation: Location where the resource is
 Cost M-1: Cost of the resource from previous month in currency specified in column "Currency"
 Cost M: Cost of the resource from current month in currency specified in column "Currency"
 Currency: Currency of cost from columns "Cost M-1" and "Cost"
-Cost USD M-1: Cost of the resource from previous month in USD
-Cost USD M: Cost of the resource from current month in USD
-Cost Variation (USD): variation of Cost between "Cost USD M" and "Cost USD M-1"
-Variation in Percent (USD): variation of cost in percent between "Cost USD M-1" and "Cost USD M"
+Cost Variation: variation of Cost between "Cost M" and "Cost M-1"
+Variation in Percent: variation of cost in percent between "Cost M-1" and "Cost M"
 
 
 ** Recommended tree structure **
