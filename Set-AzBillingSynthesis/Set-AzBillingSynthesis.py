@@ -304,7 +304,14 @@ def set_finops_tag(tags, key_tag):
 
 def cleaning_retention_files(frequency, retention, path_files, extention_file):
   """
-    PUT DESCRIPTION
+    Removes files regarding retention defined in the Json file parameter
+    Input:
+      - frequency: Monthly or Daily
+      - retention: number of files to keep (defined in the Json file parameter)
+      - path_file: directory where to remove files
+      - extension_file: extention of files
+    Output:
+      - Remove files
   """
   dates = []
   files = os.listdir(path_files)
@@ -334,7 +341,8 @@ def main():
   start = time.time() # start of script execution
 
   # === sera mis en parametres
-  csv_source_file = 'Detail_Enrollment_88991105_202408_en.csv'
+  # file = Detail_Enrollment_<Billing Account>_<yyyymm>_en.csv
+  csv_source_file = 'Detail_Enrollment_72458414_202409_en.csv'
 
   global JSON_FILE
   global GROUPING
@@ -406,14 +414,14 @@ def main():
     df = set_daily_file(df, source_path, csv_source_file, parameters['dailyNumberOfDays'], parameters['csvDetailedSeparator'], parameters['csvEncoding'])
 
   # Processes in Billing Account
-  account_file = os.path.join(parameters['pathData'], parameters['billingAccount'])
+  account_file = os.path.join(parameters['pathData'], parameters['billingAccountFile'])
   if not os.path.isfile(account_file):
     print (f'the file {account_file} was not found.')
     exit(1)
   get_billing_account(account_file, df)
 
   # Processes in Billing Profile
-  profile_file = os.path.join(parameters['pathData'], parameters['billingProfile'])
+  profile_file = os.path.join(parameters['pathData'], parameters['billingProfileFile'])
   if not os.path.isfile(profile_file):
     print (f'the file {profile_file} was not found.')
     exit(1)

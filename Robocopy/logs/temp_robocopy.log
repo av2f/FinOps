@@ -1,0 +1,200 @@
+-------------------------------------------------------------------------------
+   ROBOCOPY   ::   Copie de fichiers robuste pour Windows     
+-------------------------------------------------------------------------------
+  Démarrage : jeudi 17 octobre 2024 17:30:58
+   Source : C:\Users\fparment\Documents\Dossiers Clients\
+     Dest : C:\Users\fparment\Documents\testrobocopy\
+    Fichiers : *.*
+  Options : *.* /V /BYTES /S /E /DCOPY:DA /COPY:DAT /NP /R:1000000 /W:30 
+-------------------------------------------------------------------------------
+	                   4	C:\Users\fparment\Documents\Dossiers Clients\
+	  Nouveau fichier		 5419510	FinOps_Statement_of_Work_v0.docx
+	  Nouveau fichier		 5419269	FinOps_Statement_of_Work_v1.docx
+	  Nouveau fichier		   13374	Imputation_2024.xlsx
+	  Nouveau fichier		   28006	MEC103_AUDES_SOIE2_Lot2-MC_Expert_Exploit_Cloud_FP.xlsx
+	Nouveau rép.      17	C:\Users\fparment\Documents\Dossiers Clients\Alstom\
+	  Nouveau fichier		 2191823	Alstom FinOps Cookbook V0.1_FPA.docx
+	  Nouveau fichier		  266641	Alstom Maturity.pptx
+	  Nouveau fichier		 1962322	Alstom_FinOps_MoM_Template.docx
+	  Nouveau fichier		 1980099	Alstom_FinOps_Prerequisites_Workshops.pptx
+	  Nouveau fichier		  230030	Alstom_FinOps_Workshops_Questionnaire_v0.1.xlsx
+	  Nouveau fichier		   40648	Alstom_reco.pptx
+	  Nouveau fichier		 6925794	Alstom_Tags_Analysis_08042024.pptx
+	  Nouveau fichier		   20563	Chiffrage Alstom.xlsx
+	  Nouveau fichier		  710650	FinOps Alstom Workshop v0.1.pptx
+	  Nouveau fichier		  802071	FinOps Alstom.pptx
+	  Nouveau fichier		24263615	FinOps Support Dec 2023-V1.3.pptx
+	  Nouveau fichier		   14702	FinOps_Alstom_Deliverables.xlsx
+	  Nouveau fichier		 4951412	FinOps_Alstom_KPIs_and_Comitology_v0.1.pptx
+	  Nouveau fichier		   88496	FinOps_Alstom_Liste_Livrables.xlsx
+	  Nouveau fichier		   12743	FinOps_Team_Holidays.xlsx
+	  Nouveau fichier		    1927	mdp.txt
+	  Nouveau fichier		 1451687	Word Template.docx
+	Nouveau rép.       3	C:\Users\fparment\Documents\Dossiers Clients\Alstom\01 - Kick-Off\
+	  Nouveau fichier		23335345	Alstom_FinOps_KickOff_Fev2023_V0.2.pptx
+	  Nouveau fichier		  766724	Alstom_FinOps_Workshops_Questionnaire_v0.1.xlsx
+	  Nouveau fichier		   38493	FinOps maturity assessment.xlsx
+	Nouveau rép.       8	C:\Users\fparment\Documents\Dossiers Clients\Alstom\02 - Contract\
+	  Nouveau fichier		  105758	ALSTOM FinOps workpackages V0.1.xlsx
+	  Nouveau fichier		  321830	FOP modèle_Cloud_Infra_2023_V1.5.1.xlsb
+	  Nouveau fichier		  322551	FOP_Alstom_FinOps_2023_V1.5.1.xlsb
+	  Nouveau fichier		  416615	FOP_Alstom_FinOps_2023_V1.5.1_Final.xlsb
+	  Nouveau fichier		  321971	FOP_Alstom_FinOps_2023_V1.5.1_V0.xlsb
+	  Nouveau fichier		   24143	PnC_Deal Baseline Sample Template.xlsx
+	  Nouveau fichier		 2259456	Re Offre FinOps Capgemini pour Alstom .msg
+	  Nouveau fichier		  243712	TR Alstom sent a new Purchase Order 4101295621.msg
+	Nouveau rép.       2	C:\Users\fparment\Documents\Dossiers Clients\Alstom\02 - Contract\Notes de frais\
+	  Nouveau fichier		   11100	Alstom FinOps - Synthèse Note de Frais.xlsx
+	  Nouveau fichier		 1789522	Alstom FinOps - Travel Expenses.zip
+	Nouveau rép.       2	C:\Users\fparment\Documents\Dossiers Clients\Alstom\03 - Final Feedback\
+	  Nouveau fichier		13264801	Alstom_FinOps_Feedback_and_recommendations V0.2.pptx
+	  Nouveau fichier		  143134	FinOps_Alstpom_Improvement_Plan_v1.0.xlsx
+	Nouveau rép.       6	C:\Users\fparment\Documents\Dossiers Clients\Alstom\04 - Template\
+	  Nouveau fichier		 6247982	FinOps rules & best practices.pptx
+	  Nouveau fichier		   89345	FinOps_Best_Practices.pptx
+	  Nouveau fichier		  263412	Job-Description-Template-01.jpg
+	  Nouveau fichier		   18298	Job-Description-Template-02.docx
+	  Nouveau fichier		   17779	Job-Description-Template-06.docx
+	  Nouveau fichier		   20395	job-description-template-download-20221018.docx
+	Nouveau rép.       1	C:\Users\fparment\Documents\Dossiers Clients\Alstom\04 - Template\Cookbook\
+	  Nouveau fichier		 1952860	FinOps CookBooks v2.1 1.docx
+	Nouveau rép.       1	C:\Users\fparment\Documents\Dossiers Clients\Alstom\04 - Template\KPI\
+	  Nouveau fichier		   11687	example_kpi.xlsx
+	Nouveau rép.       1	C:\Users\fparment\Documents\Dossiers Clients\Alstom\04 - Template\Organization\
+	  Nouveau fichier		 7256956	Chanel-FinOps- FinOps regional  governance-Feb 2022.pptx
+	Nouveau rép.       2	C:\Users\fparment\Documents\Dossiers Clients\Alstom\04 - Template\Processes\
+	  Nouveau fichier		 1138921	Drill down - FinOps process V0.2.pptx
+	  Nouveau fichier		 1140548	Drill down - FinOps process V0.2_FPA.pptx
+	Nouveau rép.       6	C:\Users\fparment\Documents\Dossiers Clients\Alstom\05 - Security\
+	  Nouveau fichier		 2565356	Copie de Declaration-of-honour_FR-Thomas_Sarrazin.xlsx
+	  Nouveau fichier		  137826	Declaration-of-honour_FR Denis_Thiollier.xlsx
+	  Nouveau fichier		  172347	Declaration-of-honour_FR.pdf
+	  Nouveau fichier		  201581	Declaration-of-honour_FR_Chourouk_Hjaij.pdf
+	  Nouveau fichier		   31228	Declaration-of-honour_FR_FParmentier.xlsx
+	  Nouveau fichier		   31172	Declaration-of-honour_FR_LLauret.xlsx
+	Nouveau rép.       1	C:\Users\fparment\Documents\Dossiers Clients\Alstom\06 - Governance\
+	  Nouveau fichier		   12225	FinOps RACI.xlsx
+	Nouveau rép.       5	C:\Users\fparment\Documents\Dossiers Clients\Alstom\06 - Governance\01 - Job Description\
+	  Nouveau fichier		 1700418	Alstom_FinOps_Job_Description_v1.docx
+	  Nouveau fichier		 4316796	Cloud Economics-FinOps Capabilities.pptx
+	  Nouveau fichier		 6290214	FinOps & GreenOps profiles description.pptx
+	  Nouveau fichier		   25514	FinOps role  Job Description April 2022.docx
+	  Nouveau fichier		  141819	Job_Description_Template.docx
+	Nouveau rép.       1	C:\Users\fparment\Documents\Dossiers Clients\Alstom\06 - Governance\02 - Processes\
+	  Nouveau fichier		   79103	FinOps Journey V2.drawio
+	Nouveau rép.       2	C:\Users\fparment\Documents\Dossiers Clients\Alstom\07 - Tag\
+	  Nouveau fichier		   24943	Alstom_Finops_tags_v1.xlsx
+	  Nouveau fichier		  107045	MyWorkBook-AzureTag_11042023- Alstom Update 25-04-2023.xlsm
+	Nouveau rép.       7	C:\Users\fparment\Documents\Dossiers Clients\Alstom\Anonymisation\
+	  Nouveau fichier		   14256	Anonymization - List of files modified - FPA.xlsx
+	  Nouveau fichier		   29547	Customer_Name_FinOps_Overall_Deliverables_list.xlsx
+	  Nouveau fichier		 1231296	Job_Description_FinOps_Analyst_EN.docx
+	  Nouveau fichier		 1231294	Job_Description_FinOps_Analyst_EN_v1.0.docx
+	  Nouveau fichier		 1661822	Job_Description_FinOps_Architect_EN_v1.0.docx
+	  Nouveau fichier		 1231288	Job_Description_FinOps_Lead_EN_v1.0.docx
+	  Nouveau fichier		 1232357	Job_Description_FinOps_Practitioner_EN_v1.0.docx
+	Nouveau rép.      15	C:\Users\fparment\Documents\Dossiers Clients\Alstom\Anonymisation\Uploaded\
+	  Nouveau fichier		 1451687	Azure_Consumption_Dashboards_v1.0.pbix
+	  Nouveau fichier		 6582982	Customer_Name_Consumption_Visibility_Feedback_and_Recommendations_yyyymmdd_v1.0.pptx
+	  Nouveau fichier		 6982047	Customer_Name_Cost_Optimization_Feedback_and_Recommendations_yyyymmdd_v1.0.pptx
+	  Nouveau fichier		 8333876	Customer_Name_FinOps_Awareness_Feedback_and_Recommendations_yyyymmdd_v1.0.pptx
+	  Nouveau fichier		   23071	Customer_Name_FinOps_Execution_Deliverables.xlsx
+	  Nouveau fichier		11882713	Customer_Name_FinOps_Feedback_and_Recommendations_Light_v1.0.pptx
+	  Nouveau fichier		 9227966	Customer_Name_FinOps_Feedback_and_Recommendations_v1.0.pptx
+	  Nouveau fichier		 5301755	Customer_Name_FinOps_Governance_Definition_v1.0.pptx
+	  Nouveau fichier		 4475421	Customer_Name_FinOps_Governance_Feedback_and_Recommendations_yyyymmdd_v1.0.pptx
+	  Nouveau fichier		 5418261	Customer_Name_FinOps_Kick-Off_ShortMonthyyyy_v1.0.pptx
+	  Nouveau fichier		 3909175	Customer_Name_FinOps_Monthly_Meeting_Myyyymm_v1.0.pptx
+	  Nouveau fichier		21215469	Customer_Name_FinOps_Proposal_ShortMonthyyyy_v1.0.pptx
+	  Nouveau fichier		 6052957	Customer_Name_FinOps_Tools_Feedback_and_Recommendations_yyyymmdd_v1.0.pptx
+	  Nouveau fichier		 2633644	Customer_Name_FinOps_Weekly_Meeting_Wyyyydd_v1.0.pptx
+	  Nouveau fichier		 4091155	Example_of_Power_BI_Dashboards_v1.0.pptx
+	Nouveau rép.       1	C:\Users\fparment\Documents\Dossiers Clients\Alstom\MoM\
+	  Nouveau fichier		 2262686	Alstom_FinOps_MoM_WK1_FinOps_Governancev1.1.docx
+	Nouveau rép.       5	C:\Users\fparment\Documents\Dossiers Clients\LVMH\
+	  Nouveau fichier		 1666185	CG CMDB Inventory for MHIS_10092024.xlsx
+	  Nouveau fichier		  204358	Extract All CAP CVE 8 to 10.xlsx
+	  Nouveau fichier		  228595	LVMH - Privileged users charter v1.3.pdf
+	  Nouveau fichier		 1084031	LVMH_Power BI.zip
+	  Nouveau fichier		  635707	MHIS CMDB Inventory_10092024.xlsx
+	Nouveau rép.       1	C:\Users\fparment\Documents\Dossiers Clients\LVMH\Power BI\
+	  Nouveau fichier		  317207	LVMH_Tanium.pbix
+	Nouveau rép.       2	C:\Users\fparment\Documents\Dossiers Clients\LVMH\Power BI\Data\
+	  Nouveau fichier		  206857	Extract All CAP CVE 8 to 10.xlsx
+	  Nouveau fichier		  635707	MHIS CMDB Inventory.xlsx
+	Nouveau rép.      28	C:\Users\fparment\Documents\Dossiers Clients\Suez\
+	  Nouveau fichier		 3013143	Analyse and Design KTP and Smart Migration -v0.9.pptx
+	  Nouveau fichier		   22351	Classeur1.xlsx
+	  Nouveau fichier		  147806	Migration M2AIX - MRB - SIMPAC Lot3 - Prod_SUA V 1.0.xlsx
+	  Nouveau fichier		  137274	Migration_SMART_MRB_SMART_Recette_v1.0.xlsx
+	  Nouveau fichier		    3624	qry1SMARTPRD.LST
+	  Nouveau fichier		    1402	Requests Suez.txt
+	  Nouveau fichier		    2512	SMARTREC.zip
+	  Nouveau fichier		  272790	SMART_KTP Servers_v2.xlsx
+	  Nouveau fichier		   14933	SMART_KTP_ORACLE_DB_Informations_v1.xlsx
+	  Nouveau fichier		   17059	SMART_KTP_ORACLE_DB_Informations_v2.xlsx
+	  Nouveau fichier		   16090	smat_ktp.zip
+	  Nouveau fichier		 2426987	SUEZ-NewCitrix-v1.1.pdf
+	  Nouveau fichier		   85962	Suez_Build KTP Oracle Production_v1.1.xlsx
+	  Nouveau fichier		   85797	Suez_Build KTP Oracle Production_v1.2.xlsx
+	  Nouveau fichier		   85974	Suez_Build KTP Oracle Production_v1.xlsx
+	  Nouveau fichier		  112086	Suez_Build SMART Oracle Production_v1.1.xlsx
+	  Nouveau fichier		  112226	Suez_Build SMART Oracle Production_v1.xlsx
+	  Nouveau fichier		   61902	Suez_FW_Matrix_Oracle Production_v1.xlsx
+	  Nouveau fichier		   61851	Suez_KTP_FW Matrix_v2.0.xlsx
+	  Nouveau fichier		   78710	Suez_KTP_SMART_FollowUp_V1.xlsx
+	  Nouveau fichier		  184884	Suez_KTP_SMART_New_Oracle_Servers_Production_to_build_v1.xlsx
+	  Nouveau fichier		   79073	Suez_KTP_SMART_New_Oracle_Servers_to_build_v1.xlsx
+	  Nouveau fichier		   38489	Suez_KTP_SMART_Planning_v1.xlsx
+	  Nouveau fichier		   15170	Suez_KTP_SMART_Post_migration_informations_v1.xlsx
+	  Nouveau fichier		   12234	Suez_Request_for_building_KTP_Prod_Datastore.xlsx
+	  Nouveau fichier		   12288	Suez_Request_for_building_SMART_Prod_Datastore.xlsx
+	  Nouveau fichier		   15027	Suez_Request_for_building_SMART_Prod_Datastore_v2.xlsx
+	  Nouveau fichier		   61809	Suez_SMART_FW Matrix_v1.0.xlsx
+	Nouveau rép.       2	C:\Users\fparment\Documents\Dossiers Clients\Suez\Chronogramme\
+	  Nouveau fichier		  116451	Migration_Suez_MRB_KTP_Recette_v1.0.xlsx
+	  Nouveau fichier		  116551	Migration_Suez_MRB_SMART_Recette_v1.0.xlsx
+	Nouveau rép.       8	C:\Users\fparment\Documents\Dossiers Clients\Suez\Contract\
+	  Nouveau fichier		  557501	FOP_SUEZ_Build_Citrix.xlsb
+	  Nouveau fichier		  554415	FOP_SUEZ_Migration_KTP_SMART_MSEast_v2.xlsb
+	  Nouveau fichier		  554819	FOP_SUEZ_Migration_KTP_SMART_MSIDF_v2.xlsb
+	  Nouveau fichier		  615362	FOP_SUEZ_Migration_KTP_SMART_PC CE_with DAV.xlsb
+	  Nouveau fichier		  615499	FOP_SUEZ_Migration_KTP_SMART_PC.xlsb
+	  Nouveau fichier		  554778	FOP_SUEZ_Migration_KTP_SMART_PC_v2.xlsb
+	  Nouveau fichier		  232454	PO187205_New_Plateforme_Citrix_OneDC-CAPGEMINI_TECHNOLOGY_SERVICES.pdf
+	  Nouveau fichier		  232131	PO189290_P2_M2C_-_Migration_Smart___KTP-CAPGEMINI_TECHNOLOGY_SERVICES.pdf
+	Nouveau rép.      22	C:\Users\fparment\Documents\Dossiers Clients\Suez\NetApp\
+	  Nouveau fichier		   20828	20185266_06-Aug-24_02-20-01_C400 5 ANS 20x15TB 450TB  2_1 site 2.xls.xlsx
+	  Nouveau fichier		   20819	20185273_06-Aug-24_02-24-38_C400 5 ANS 20x15TB 450TB 2_1 site 1.xls.xlsx
+	  Nouveau fichier		 1704831	20240719_NetApp_C400_5 ANS 20x15TB 450TB.pdf
+	  Nouveau fichier		   60723	330023338-01NETAPP.pdf
+	  Nouveau fichier		   61314	330023339-01NETAPP.pdf
+	  Nouveau fichier		   21463	41396808.pdf
+	  Nouveau fichier		  905289	DealReviewPackage_SUEZ - NAS Migration(ID 65186 v32).xlsm
+	  Nouveau fichier		  698141	DealReviewPackage_SUEZ - Storage management (ID 65186 v30).xlsm
+	  Nouveau fichier		  561999	FOP_SUEZ_Resell_NetApp-Pilotage_NAS-B2R_MSEast_v1.xlsb
+	  Nouveau fichier		   81080	Modele_Matrice_V3.xltm
+	  Nouveau fichier		 2491734	NetApp_Building_Weekly_Status_w40.pptx
+	  Nouveau fichier		   15038	Order Status report for NetApp Support Site 330023338.xlsx
+	  Nouveau fichier		   15050	Order Status report for NetApp Support Site 330023339.xlsx
+	  Nouveau fichier		  231015	PO189785_M2C_P2_-_CFS_Lot_1_-_Integration_Cap___B2R-CAPGEMINI_TECHNOLOGY_SERVICES.pdf
+	  Nouveau fichier		  213334	Preuve Livraison DATA4.jpg
+	  Nouveau fichier		 4161745	Prérequis_installation_baie_NETAPP_C400_v2.1.xlsx
+	  Nouveau fichier		   11614	Question_cdc_Migration_Data_NetApp_v1.xlsx
+	  Nouveau fichier		    3883	SO#330023338.pdf
+	  Nouveau fichier		    4084	SO#330023339.pdf
+	  Nouveau fichier		 1355685	SUEZ - Management integration NAS & Build To Run.pdf
+	  Nouveau fichier		21842475	SUEZ - NAS INTEGRATION V4.pptx
+	  Nouveau fichier		   13023	Suez_NetApp_BuildToRun_Topics_v0.1.xlsx
+	Nouveau rép.       2	C:\Users\fparment\Documents\Dossiers Clients\Suez\Pb DCOM\
+	  Nouveau fichier		   21043	thumbnail_image001.png
+	  Nouveau fichier		   10894	thumbnail_image002.png
+-------------------------------------------------------------------------------
+               Total     Copié    IgnoréDiscordance     ÉCHEC    Extras
+     Rép :        27        26         1         0         0         0
+Fichiers :       155       155         0         0         0         0
+  Octets : 291468197 291468197         0         0         0         0
+   Heures:   0:00:04   0:00:04                       0:00:00   0:00:00
+   Débit :           66 773 928 Octets/sec.
+   Débit :             3820,835 Méga-octets/min.
+   Fin : jeudi 17 octobre 2024 17:31:03

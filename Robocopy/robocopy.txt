@@ -1,0 +1,14 @@
+source : C:\Users\fparment\Documents\FinOps\*.pptx
+
+C:\Users\fparment\Documents\testrobocopy
+
+robocopy C:\Users\fparment\Documents\FinOps C:\Users\fparment\Documents\testrobocopy *.pptx
+
+
+robocopy C:\Users\fparment\Documents\Dossiers Clients C:\Users\fparment\Documents\testrobocopy *.pptx /unilog:robocopy.log /ns /nc /nfl /ndl /np
+
+
+$log = Get-Content .\robocopy.log
+($log | Measure-Object).Count => renvoie le nombre de lignes
+
+Suppression des lignes vides: Get-Content .\robocopy.log | ? { -not [String]::IsNullOrWhiteSpace($_) } | Set-Content .\robocopy2.log
