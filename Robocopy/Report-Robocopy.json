@@ -1,7 +1,9 @@
 {
-  "logfiles": "C:/Users/fparment/Documents/Robocopy/Logs/",
-  "pathResult": "C:/Users/fparment/Documents/Robocopy/Reports/",
+  "logFiles": "C:/Users/fparment/Documents/AzFinOps/Scripts/Robocopy/Logs/",
+  "pathResult": "C:/Users/fparment/Documents/AzFinOps/Scripts/Robocopy/Reports/",
   "fileResult": "ReportRobocopy",
+  "robocopyLog": "LogRobocopy",
+  "tmpRobocopyLog": "TmpLogRobocopy",
   "chronoFile": "Y",
   "generateLogFile": "Y"
 }
